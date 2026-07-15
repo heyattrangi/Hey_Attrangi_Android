@@ -1,0 +1,46 @@
+import { Session } from '../types/domain';
+
+export const mockSessions: Session[] = [
+  {
+    id: 's1',
+    therapistId: '2',
+    therapistName: 'Dr. Devi Kapoor',
+    date: '1st March, 2026',
+    time: '6:30-7:30 PM',
+    type: 'Video Session',
+    status: 'upcoming',
+    confirmed: true,
+    meetingUrl: 'https://meet.aatrangi.app/s1',
+  },
+  {
+    id: 's2',
+    therapistId: '1',
+    therapistName: 'Dr. Ananya Sharma',
+    date: '13th April, 2026',
+    time: '6:30-7:15 pm',
+    type: 'Video Session',
+    status: 'upcoming',
+    confirmed: true,
+    meetingUrl: 'https://meet.aatrangi.app/s2',
+  },
+  {
+    id: 's3',
+    therapistId: '3',
+    therapistName: 'Dr. Rahul Mehta',
+    date: 'Jun 20, 3:00 PM',
+    time: '3:00 PM',
+    type: 'Video Session',
+    status: 'completed',
+    confirmed: false,
+  },
+  {
+    id: 's4',
+    therapistId: '1',
+    therapistName: 'Dr. Ananya Sharma',
+    date: '10th Feb, 2026',
+    time: '4:00-4:45 PM',
+    type: 'Audio Session',
+    status: 'cancelled',
+    confirmed: false,
+  },
+];

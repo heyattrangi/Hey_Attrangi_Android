@@ -1,0 +1,66 @@
+{
+  "expo": {
+    "name": "Hey Attrangi",
+    "slug": "hey-attrangi",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "heyattrangi",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFF8F0"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.heyaatrangi.expo",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSUserTrackingUsageDescription": "Hey Attrangi does not track you across apps. This string is reserved for future privacy-safe analytics opt-in.",
+        "NSCameraUsageDescription": "Camera access is used for video therapy sessions when you join a call.",
+        "NSMicrophoneUsageDescription": "Microphone access is used for video therapy and voice companion features when you enable them.",
+        "NSPhotoLibraryUsageDescription": "Photo library access is used when you choose a profile photo."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FFF8F0",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.heyaatrangi.expo",
+      "versionCode": 1,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-font",
+      "expo-image",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFF8F0"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "replace-with-eas-project-id"
+      },
+      "privacyPolicyUrl": "https://heyattrangi.app/privacy",
+      "termsOfServiceUrl": "https://heyattrangi.app/terms",
+      "releaseChannel": "rc"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
+  }
+}

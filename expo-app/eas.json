@@ -1,0 +1,70 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "development",
+        "EXPO_PUBLIC_USE_MOCK": "true",
+        "EXPO_PUBLIC_RELEASE_CHANNEL": "development"
+      },
+      "ios": {
+        "simulator": true
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "staging",
+        "EXPO_PUBLIC_USE_MOCK": "true",
+        "EXPO_PUBLIC_RELEASE_CHANNEL": "internal"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "beta": {
+      "distribution": "store",
+      "channel": "beta",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "staging",
+        "EXPO_PUBLIC_USE_MOCK": "false",
+        "EXPO_PUBLIC_RELEASE_CHANNEL": "beta"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_USE_MOCK": "false",
+        "EXPO_PUBLIC_RELEASE_CHANNEL": "production"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "replace-with-app-store-connect-id"
+      },
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    },
+    "beta": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    }
+  }
+}

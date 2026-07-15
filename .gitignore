@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Expo / Metro
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+
+# Native builds (prebuild output stays local)
+**/android/app/build/
+**/android/build/
+**/android/.gradle/
+**/.gradle/
+**/ios/build/
+**/ios/Pods/
+DerivedData/
+*.apk
+*.aab
+*.ipa
+*.jsbundle
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+*.pem
+*.log
+*.hprof
+.cxx/
+local.properties
+
+# Keys / signing
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.keystore
+!debug.keystore
+
+# Coverage / misc
+coverage/
+*.tsbuildinfo
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Nested git backups
+.git.bak-nested/
+**/.git.bak-nested/

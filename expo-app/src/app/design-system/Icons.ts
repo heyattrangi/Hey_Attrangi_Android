@@ -1,0 +1,106 @@
+/**
+ * Hey Attrangi — Icon Name Map
+ * MaterialCommunityIcons keys used across the product.
+ */
+
+export const Icons = {
+  // Navigation
+  back: 'arrow-left',
+  forward: 'arrow-right',
+  chevronRight: 'chevron-right',
+  chevronDown: 'chevron-down',
+  home: 'home-outline',
+  homeActive: 'home',
+  chat: 'message-text-outline',
+  chatActive: 'message-text',
+  mood: 'emoticon-outline',
+  moodActive: 'emoticon',
+  therapists: 'account-group-outline',
+  therapistsActive: 'account-group',
+  profile: 'account-outline',
+  profileActive: 'account',
+
+  // Actions
+  send: 'send',
+  mic: 'microphone',
+  micOff: 'microphone-off',
+  attach: 'paperclip',
+  image: 'image-outline',
+  file: 'file-document-outline',
+  play: 'play',
+  pause: 'pause',
+  waveform: 'waveform',
+  search: 'magnify',
+  edit: 'pencil-outline',
+  plus: 'plus',
+  check: 'check',
+  checkCircle: 'check-circle',
+  close: 'close',
+  camera: 'camera-outline',
+  eye: 'eye-outline',
+  eyeOff: 'eye-off-outline',
+  alert: 'alert-circle',
+  alertOutline: 'alert-circle-outline',
+  leaf: 'leaf',
+  sleep: 'sleep',
+  brain: 'brain',
+  bookOpen: 'book-open-outline',
+  lightbulb: 'lightbulb-outline',
+  handHeart: 'hand-heart',
+  wind: 'weather-windy',
+  meditation: 'meditation',
+  yoga: 'yoga',
+  water: 'water-outline',
+  share: 'share-variant-outline',
+  bookmark: 'bookmark-outline',
+  bookmarkFilled: 'bookmark',
+  heartFilled: 'heart',
+  journal: 'notebook-outline',
+  timer: 'timer-outline',
+  trophy: 'trophy-outline',
+
+  // Features
+  calendar: 'calendar-month-outline',
+  clock: 'clock-outline',
+  video: 'video-outline',
+  sessions: 'calendar-clock',
+  star: 'star',
+  heart: 'heart-outline',
+  logout: 'logout',
+  settings: 'cog-outline',
+  sparkles: 'creation',
+  people: 'account-group-outline',
+  creditCard: 'credit-card-outline',
+  upi: 'wallet-outline',
+  wallet: 'wallet-outline',
+  phone: 'cellphone',
+  mapPin: 'map-marker-outline',
+  empty: 'inbox-outline',
+  book: 'calendar-plus',
+  filter: 'filter-variant',
+  bell: 'bell-outline',
+  shield: 'shield-outline',
+
+  // Moods (no emoji dependency)
+  moodCalm: 'weather-night',
+  moodHappy: 'emoticon-happy-outline',
+  moodOkay: 'emoticon-neutral-outline',
+  moodFrustrated: 'emoticon-angry-outline',
+  moodSad: 'emoticon-sad-outline',
+  moodOverwhelmed: 'head-flash-outline',
+  moodTerrible: 'emoticon-cry-outline',
+  moodBad: 'emoticon-frown-outline',
+  moodGood: 'emoticon-happy-outline',
+} as const;
+
+export type IconKey = keyof typeof Icons;
+export type IconName = (typeof Icons)[IconKey];
+
+export const IconSizes = {
+  xs: 16,
+  sm: 18,
+  md: 20,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+} as const;

@@ -1,0 +1,1 @@
+export { SkeletonChat } from './Skeletons';
