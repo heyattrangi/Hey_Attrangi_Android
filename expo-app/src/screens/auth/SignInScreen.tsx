@@ -1,23 +1,25 @@
 import React, { useRef, useState } from 'react';
-import { StyleSheet, View, Text, Pressable, TextInput as RNTextInput } from 'react-native';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { StyleSheet, View, TouchableOpacity, TextInput as RNTextInput, ScrollView } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { OnboardingContainer } from '../../components/common/OnboardingContainer';
-import { ScreenHeader } from '../../components/common/ScreenHeader';
-import { Input } from '../../components/ui/Input';
-import { PasswordInput } from '../../components/ui/PasswordInput';
-import { PrimaryButton } from '../../components/common/PrimaryButton';
-import { SecondaryButton } from '../../components/common/SecondaryButton';
+import { Icon, AppIcons } from '../../components/app/Icon';
 import { useAuthStore } from '../../store/authStore';
 import { AuthStackParamList } from '../../navigation/types';
-import { Colors, Typography, Spacing, Motion } from '../../theme';
+import {
+  Screen,
+  Text,
+  Button,
+  Input,
+  Colors,
+  Typography,
+  Spacing,
+  Radii,
+} from '../../design-system';
 import { hapticError, hapticLight } from '../../utils/haptics';
 
 type Props = {
   navigation: NativeStackNavigationProp<AuthStackParamList, 'SignIn'>;
 };
 
-/** Design 1.png — Welcome Back / Sign In */
 export const SignInScreen: React.FC<Props> = ({ navigation }) => {
   const login = useAuthStore((s) => s.login);
   const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
@@ -70,25 +72,37 @@ export const SignInScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <OnboardingContainer
-      glowPosition="topRight"
-      onBackPress={() => navigation.goBack()}
-    >
-      <View style={styles.container}>
-        <Animated.View entering={FadeInDown.duration(Motion.duration.normal)}>
-          <ScreenHeader
-            title="Welcome Back!"
-            subtitle="Your companion for mental wellness"
-          />
-        </Animated.View>
-
-        <Animated.View
-          style={styles.form}
-          entering={FadeInUp.delay(80).duration(Motion.duration.normal)}
+    <Screen backgroundColor={Colors.surface}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Back Link */}
+        <TouchableOpacity
+          style={styles.backRow}
+          onPress={() => {
+            void hapticLight();
+            navigation.goBack();
+          }}
         >
+          <Icon name={AppIcons.back} size={18} color={Colors.brandPrimary} />
+          <Text variant="bodyMedium" color={Colors.brandPrimary} style={styles.backText}>
+            Back
+          </Text>
+        </TouchableOpacity>
+
+        {/* Header */}
+        <View style={styles.header}>
+          <Text variant="heading1" style={styles.title}>
+            Login or Signup to Hey Attrangi
+          </Text>
+          <Text variant="bodyMedium" color={Colors.textSecondary} style={styles.subtitle}>
+            Enter your email address to continue your mental wellness journey.
+          </Text>
+        </View>
+
+        {/* Form Controls */}
+        <View style={styles.form}>
           <Input
             label="Email or phone"
-            placeholder="Enter your email or phone number"
+            placeholder="Email address"
             value={emailOrPhone}
             onChangeText={(text) => {
               setEmailOrPhone(text);
@@ -103,8 +117,8 @@ export const SignInScreen: React.FC<Props> = ({ navigation }) => {
             blurOnSubmit={false}
             textContentType="username"
           />
-          <PasswordInput
-            ref={passwordRef}
+
+          <Input
             label="Password"
             placeholder="Enter your password"
             value={password}
@@ -113,6 +127,7 @@ export const SignInScreen: React.FC<Props> = ({ navigation }) => {
               if (errors.password) setErrors((e) => ({ ...e, password: undefined }));
             }}
             error={errors.password}
+            secureTextEntry
             returnKeyType="done"
             onSubmitEditing={() => {
               if (canSubmit) void handleSignIn();
@@ -120,25 +135,24 @@ export const SignInScreen: React.FC<Props> = ({ navigation }) => {
             textContentType="password"
           />
 
-          <Pressable
+          <TouchableOpacity
             style={styles.forgotPassword}
             onPress={() => {
               void hapticLight();
               navigation.navigate('ForgotPassword');
             }}
-            accessibilityRole="link"
-            accessibilityLabel="Forgot Password"
           >
-            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-          </Pressable>
-        </Animated.View>
+            <Text variant="caption" color={Colors.brandPrimary} style={styles.forgotText}>
+              Forgot Password?
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-        <Animated.View
-          style={styles.actions}
-          entering={FadeInUp.delay(140).duration(Motion.duration.normal)}
-        >
-          <PrimaryButton
-            label="Sign In"
+        {/* Actions */}
+        <View style={styles.actions}>
+          <Button
+            variant="primary"
+            label="CONTINUE"
             onPress={handleSignIn}
             loading={loading}
             disabled={!canSubmit}
@@ -146,66 +160,102 @@ export const SignInScreen: React.FC<Props> = ({ navigation }) => {
 
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
+            <Text variant="caption" color={Colors.textMuted} style={styles.dividerText}>
+              OR
+            </Text>
             <View style={styles.dividerLine} />
           </View>
 
-          <SecondaryButton
+          <Button
+            variant="secondary"
             label="Continue with Google"
             onPress={handleGoogleSignIn}
             loading={loading}
             disabled={loading}
             icon={
-              <View style={styles.googleIconContainer}>
+              <View style={styles.googleIconCircle}>
                 <Text style={styles.googleLetter}>G</Text>
               </View>
             }
           />
-        </Animated.View>
 
+          <Button
+            variant="ghost"
+            label="Sign in with email code"
+            onPress={() => {
+              void hapticLight();
+              navigation.navigate('EmailOtpSignIn');
+            }}
+            disabled={loading}
+            style={styles.otpBtn}
+          />
+        </View>
+
+        {/* Footer Link */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account? </Text>
-          <Pressable
+          <Text variant="bodyMedium" color={Colors.textSecondary}>
+            Don't have an account?{' '}
+          </Text>
+          <TouchableOpacity
             onPress={() => {
               void hapticLight();
               navigation.navigate('SignUpBasic');
             }}
-            accessibilityRole="link"
           >
-            <Text style={styles.footerLink}>Create one</Text>
-          </Pressable>
+            <Text variant="bodyMedium" color={Colors.brandPrimary} style={styles.createLink}>
+              Create one
+            </Text>
+          </TouchableOpacity>
         </View>
-      </View>
-    </OnboardingContainer>
+      </ScrollView>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  scrollContent: {
+    padding: Spacing.lg,
     paddingTop: Spacing.md,
   },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+    gap: 4,
+  },
+  backText: {
+    fontWeight: '600',
+  },
+  header: {
+    marginBottom: Spacing.lg,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    marginBottom: Spacing.xs,
+  },
+  subtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
   form: {
-    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginTop: -Spacing.xs,
-    marginBottom: Spacing.xs,
+    marginTop: 4,
   },
-  forgotPasswordText: {
-    ...Typography.link,
-    color: Colors.primary,
+  forgotText: {
+    fontWeight: '700',
   },
   actions: {
-    width: '100%',
-    marginTop: Spacing.md,
+    gap: Spacing.sm,
   },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '100%',
-    marginVertical: Spacing.md,
+    marginVertical: Spacing.sm,
   },
   dividerLine: {
     flex: 1,
@@ -213,40 +263,35 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.borderDefault,
   },
   dividerText: {
-    ...Typography.caption,
-    color: Colors.textMuted,
     marginHorizontal: Spacing.md,
-    fontWeight: '600',
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
-  googleIconContainer: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  googleIconCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     borderWidth: 1,
     borderColor: Colors.borderDefault,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginRight: Spacing.sm,
+    justifyContent: 'center',
+    marginRight: 6,
   },
   googleLetter: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     color: Colors.brandGoogle,
+  },
+  otpBtn: {
+    marginTop: 4,
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: Spacing.xl,
-    flexWrap: 'wrap',
   },
-  footerText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-  },
-  footerLink: {
-    ...Typography.body,
-    color: Colors.primary,
-    fontWeight: '700',
+  createLink: {
+    fontWeight: '800',
   },
 });

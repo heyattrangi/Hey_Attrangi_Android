@@ -15,6 +15,7 @@ import {
 import { NoCareCreditsState } from '../../components/ui-states';
 import { PrimaryButton } from '../../components/common/PrimaryButton';
 import { useBillingStore } from '../../store/billingStore';
+import { billingRepository } from '../../repositories/BillingRepository';
 import { useUiStore } from '../../store/uiStore';
 import { CareReward } from '../../types/domain';
 import { MainStackParamList } from '../../navigation/types';
@@ -41,6 +42,20 @@ export const CareCreditsScreen: React.FC<Props> = ({ navigation }) => {
   const balanceAnim = useAnimatedStyle(() => ({
     transform: [{ scale: balanceScale.value }],
   }));
+
+  const [remoteCredits, setRemoteCredits] = useState<any>(null);
+
+  useEffect(() => {
+    async function loadBackendCredits() {
+      try {
+        const res = await billingRepository.getCredits();
+        setRemoteCredits(res);
+      } catch {
+        // Fallback
+      }
+    }
+    loadBackendCredits();
+  }, []);
 
   useEffect(() => {
     if (careStatus === 'idle') fetchCareCredits();
@@ -104,7 +119,7 @@ export const CareCreditsScreen: React.FC<Props> = ({ navigation }) => {
       <Animated.View style={balanceAnim}>
         <AppCard style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>Total Balance</Text>
-          <Text style={styles.balanceAmount}>{care.balance}</Text>
+          <Text style={styles.balanceAmount}>{remoteCredits?.total_credits ?? care.balance}</Text>
           <View style={styles.divider} />
           <View style={styles.statsRow}>
             <View style={styles.stat}>
@@ -113,7 +128,7 @@ export const CareCreditsScreen: React.FC<Props> = ({ navigation }) => {
             </View>
             <View style={styles.stat}>
               <Text style={styles.statLabel}>Daily Streak</Text>
-              <Text style={styles.statValue}>{care.dailyStreak}</Text>
+              <Text style={styles.statValue}>{remoteCredits?.current_streak ?? care.dailyStreak}</Text>
             </View>
           </View>
         </AppCard>

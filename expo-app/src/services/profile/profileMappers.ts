@@ -43,7 +43,7 @@ export function mapBackendUserToPersonalInfo(
   return {
     ...emptyPersonalInfo(),
     ...local,
-    fullName: user.name,
+    fullName: user.name ?? '',
     email: user.email,
     phone: user.phone?.replace(/\D/g, '').slice(-10) ?? local.phone ?? '',
     gender: user.gender ?? local.gender ?? '',

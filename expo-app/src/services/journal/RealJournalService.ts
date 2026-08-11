@@ -9,7 +9,22 @@ export class RealJournalService implements IJournalService {
   async listEntries(): Promise<ApiResponse<JournalEntry[]>> {
     try {
       const remote = await journalRepository.list();
-      if (remote.length) return successResponse(remote);
+      if (remote.length) {
+        const mapped: JournalEntry[] = remote.map((t) => ({
+          id: t.id,
+          title: t.title || 'Journal Entry',
+          body: t.content,
+          emotionTags: t.tags || [],
+          isDraft: false,
+          createdAt: t.createdAt,
+          updatedAt: t.createdAt,
+          dateLabel: new Date(t.createdAt).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+          }),
+        }));
+        return successResponse(mapped);
+      }
       return mockJournalService.listEntries();
     } catch (error) {
       return failureResponse(normalizeServiceError(error));

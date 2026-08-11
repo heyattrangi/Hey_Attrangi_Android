@@ -10,6 +10,7 @@ export {
   mapMoodInputToBackend,
   mapAiReply,
   mapSession,
+  phoneToSignupEmail,
 } from '../../api/mappers';
 
 export { mapBackendSession } from '../../services/sessions/sessionMappers';

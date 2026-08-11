@@ -967,6 +967,7 @@ export interface LoginCredentials {
 
 export interface SignUpPayload {
   name: string;
+  email?: string;
   phone: string;
   countryCode: string;
   password: string;
@@ -1574,6 +1575,7 @@ export type PlatformRoleId =
 export type MainTabId =
   | 'HomeTab'
   | 'ChatTab'
+  | 'JourneyTab'
   | 'MoodTab'
   | 'TherapistsTab'
   | 'ProfileTab'

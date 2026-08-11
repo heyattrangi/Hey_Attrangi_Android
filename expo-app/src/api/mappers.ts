@@ -45,16 +45,25 @@ const MOOD_LABELS: Record<string, string> = {
   calm: 'Calm',
 };
 
-export const mapAuthResponse = (payload: BackendAuthResponse): AuthSession => ({
-  accessToken: payload.token,
-  userId: payload.user.id,
-  isReturningUser: payload.user.onboardingCompleted ?? !payload.needsOnboarding,
-});
+export const mapAuthResponse = (payload: BackendAuthResponse): AuthSession => {
+  const userObj = payload?.user ?? (payload as any) ?? {};
+  const userId = userObj.id ?? (userObj as any).sub ?? (payload as any)?.id ?? 'user_' + Date.now();
+  const isReturningUser =
+    userObj.onboardingCompleted ??
+    (payload?.needsOnboarding !== undefined ? !payload.needsOnboarding : true);
+
+  return {
+    accessToken: payload?.accessToken ?? '',
+    refreshToken: payload?.refreshToken,
+    userId,
+    isReturningUser,
+  };
+};
 
 export const mapAuthUser = (user: BackendAuthUser): AuthSession => ({
   accessToken: '',
-  userId: user.id,
-  isReturningUser: user.onboardingCompleted,
+  userId: user?.id ?? '',
+  isReturningUser: user?.onboardingCompleted ?? true,
 });
 
 export const mapTherapist = (raw: BackendTherapist): Therapist => {

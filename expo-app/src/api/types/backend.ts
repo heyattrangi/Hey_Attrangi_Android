@@ -2,14 +2,16 @@
 
 export interface BackendAuthUser {
   id: string;
-  name: string;
   email: string;
-  role: string;
-  onboardingCompleted: boolean;
-  phone: string | null;
-  age: number | null;
-  gender: string | null;
-  profilePhoto: string | null;
+  name?: string | null;
+  role?: string | null;
+  plan?: string | null;
+  orgId?: string | null;
+  onboardingCompleted?: boolean;
+  phone?: string | null;
+  age?: number | null;
+  gender?: string | null;
+  profilePhoto?: string | null;
 }
 
 export interface BackendGoogleAuthRequest {
@@ -42,9 +44,11 @@ export interface BackendOtpVerifyResponse {
 }
 
 export interface BackendAuthResponse {
-  token: string;
-  needsOnboarding: boolean;
+  accessToken: string;
+  refreshToken?: string;
+  expiresIn?: number;
   user: BackendAuthUser;
+  needsOnboarding?: boolean;
 }
 
 export interface BackendTherapist {

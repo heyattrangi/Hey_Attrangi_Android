@@ -4,6 +4,13 @@ import { StatusBar, useColorScheme, View, StyleSheet, ActivityIndicator } from '
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   useFonts,
+  Quicksand_300Light,
+  Quicksand_400Regular,
+  Quicksand_500Medium,
+  Quicksand_600SemiBold,
+  Quicksand_700Bold,
+} from '@expo-google-fonts/quicksand';
+import {
   PlusJakartaSans_400Regular,
   PlusJakartaSans_500Medium,
   PlusJakartaSans_600SemiBold,
@@ -37,6 +44,11 @@ void SplashScreen.preventAutoHideAsync().catch(() => {
 export default function App() {
   const isDarkMode = useColorScheme() === 'dark';
   const [fontsLoaded, fontError] = useFonts({
+    Quicksand_300Light,
+    Quicksand_400Regular,
+    Quicksand_500Medium,
+    Quicksand_600SemiBold,
+    Quicksand_700Bold,
     PlusJakartaSans_400Regular,
     PlusJakartaSans_500Medium,
     PlusJakartaSans_600SemiBold,

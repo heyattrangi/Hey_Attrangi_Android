@@ -20,7 +20,8 @@ const en = {
   },
   tabs: {
     home: 'Home',
-    companion: 'Companion',
+    companion: 'Talk to Attrangi',
+    journey: 'Journey',
     mood: 'Mood',
     therapists: 'Therapists',
     profile: 'Profile',

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuthStore } from '../store/authStore';
@@ -10,14 +11,13 @@ import { linking } from './linking';
 import { registerSessionExpiredHandler } from '../services/errors/globalErrorHandler';
 import { SessionExpiredDialog } from '../components/ui/dialogs';
 import { analytics } from '../services/analytics/AnalyticsService';
+import { Colors } from '../design-system';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const RootNavigator = () => {
   const { isAuthenticated, hasCompletedOnboarding, logout } = useAuthStore();
   const [sessionExpiredVisible, setSessionExpiredVisible] = useState(false);
-
-  const navKey = `${isAuthenticated}-${hasCompletedOnboarding}`;
 
   useEffect(() => {
     registerSessionExpiredHandler(() => {
@@ -28,6 +28,16 @@ export const RootNavigator = () => {
   useEffect(() => {
     analytics.track('app_open');
   }, []);
+
+  const selectedRoute = !isAuthenticated
+    ? 'GuestChat'
+    : !hasCompletedOnboarding
+      ? 'Onboarding'
+      : 'MainTabs';
+
+  console.log(`[ROOT NAV] rendering selected route: ${selectedRoute}`);
+
+  const navKey = `${isAuthenticated}-${hasCompletedOnboarding}`;
 
   return (
     <NavigationContainer key={navKey} linking={linking}>
@@ -51,3 +61,12 @@ export const RootNavigator = () => {
     </NavigationContainer>
   );
 };
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#FAF8F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

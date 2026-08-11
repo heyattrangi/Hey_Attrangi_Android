@@ -59,8 +59,8 @@ export const ALL_PLATFORM_ROLES: PlatformRole[] = [
 
 const studentTabs: MainTabId[] = [
   'HomeTab',
-  'InstitutionTab',
   'ChatTab',
+  'JourneyTab',
   'MoodTab',
   'ProfileTab',
 ];

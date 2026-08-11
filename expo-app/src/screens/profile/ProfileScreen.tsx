@@ -1,372 +1,395 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { CompositeNavigationProp } from '@react-navigation/native';
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { AppScreen } from '../../components/app';
-import { ProfileCard } from '../../components/ui/ProfileCard';
-import { SettingsItem } from '../../components/ui/SettingsItem';
-import { PrimaryButton } from '../../components/ui/PrimaryButton';
-import { Icon } from '../../components/app/Icon';
-import { LogoutDialog } from '../../components/ui/dialogs';
+import React, { useEffect, useState } from 'react';
 import {
-  ProfileCompletionBar,
-  SkeletonProfileHub,
-} from '../../components/profile';
+  StyleSheet,
+  View,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Switch,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Icon, AppIcons } from '../../components/app/Icon';
 import { useAuthStore } from '../../store/authStore';
 import { useProfileStore } from '../../store/profileStore';
-import { computeProfileCompletion } from '../../store/preferencesStore';
-import { ageFromDateOfBirth } from '../../services/profile/profileMappers';
-import { MainStackParamList, MainTabParamList } from '../../navigation/types';
-import { Colors, Typography, Spacing, Radius } from '../../app/design-system';
-import { Icons } from '../../theme/icons';
-import { buttonA11y } from '../../utils/accessibility';
+import { profileRepository } from '../../repositories/ProfileRepository';
+import { MainStackParamList } from '../../navigation/types';
+import {
+  Screen,
+  Text,
+  Button,
+  Card,
+  Badge,
+  Input,
+  Chip,
+  Avatar,
+  Divider,
+  Colors,
+  Typography,
+  Spacing,
+  Radii,
+} from '../../design-system';
+import { hapticLight, hapticSuccess, hapticError, hapticSelection } from '../../utils/haptics';
 
-type ProfileNav = CompositeNavigationProp<
-  BottomTabNavigationProp<MainTabParamList, 'ProfileTab'>,
-  NativeStackNavigationProp<MainStackParamList>
->;
+type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
-const MENU_SECTIONS: Array<{
-  title: string;
-  items: Array<{ label: string; screen: keyof MainStackParamList }>;
-}> = [
-  {
-    title: 'Profile',
-    items: [
-      { label: 'Personal Information', screen: 'PersonalInformation' },
-      { label: 'Email & Security', screen: 'EmailSecurity' },
-      { label: 'Notifications', screen: 'Notifications' },
-      { label: 'Billing & Invoices', screen: 'BillingInvoices' },
-      { label: 'Care Credits', screen: 'CareCredits' },
-    ],
-  },
-  {
-    title: 'Institution',
-    items: [
-      { label: 'Campus Dashboard', screen: 'InstitutionDashboard' },
-      { label: 'Institution Profile', screen: 'InstitutionProfile' },
-      { label: 'Campus Programs', screen: 'CampusPrograms' },
-      { label: 'Announcements', screen: 'InstitutionAnnouncements' },
-      { label: 'Campus Resources', screen: 'CampusResources' },
-      { label: 'Campus Notifications', screen: 'InstitutionNotifications' },
-      { label: 'Student Wellness', screen: 'StudentWellnessDashboard' },
-      { label: 'Switch Role', screen: 'RoleSwitcher' },
-    ],
-  },
-  {
-    title: 'Community',
-    items: [
-      { label: 'Community Home', screen: 'CommunityHome' },
-      { label: 'Groups', screen: 'CommunityGroups' },
-      { label: 'Events', screen: 'CommunityEvents' },
-      { label: 'Peer Discussions', screen: 'PeerDiscussions' },
-      { label: 'Anonymous Mode', screen: 'AnonymousMode' },
-      { label: 'Saved Posts', screen: 'SavedPosts' },
-      { label: 'Group Wellness', screen: 'GroupWellness' },
-      { label: 'Moderation Queue', screen: 'ModerationQueue' },
-      { label: 'Report Content', screen: 'ContentReport' },
-    ],
-  },
-  {
-    title: 'Therapist / Admin portal',
-    items: [
-      { label: 'Therapist Dashboard', screen: 'TherapistDashboard' },
-      { label: 'Schedule', screen: 'TherapistSchedule' },
-      { label: 'Appointments', screen: 'TherapistAppointments' },
-      { label: 'Availability', screen: 'TherapistAvailability' },
-      { label: 'Client List', screen: 'TherapistClientList' },
-      { label: 'Portal Reports', screen: 'PortalReports' },
-      { label: 'Admin Dashboard', screen: 'AdminDashboard' },
-      { label: 'Institution Analytics', screen: 'InstitutionAnalytics' },
-    ],
-  },
-  {
-    title: 'Developer',
-    items: [
-      { label: 'Developer Menu', screen: 'DevToolsMenu' },
-      { label: 'Component Gallery', screen: 'ComponentGallery' },
-      { label: 'Component Showcase', screen: 'ComponentShowcase' },
-      { label: 'Feature Toggles', screen: 'FeatureToggle' },
-      { label: 'Mock API Switch', screen: 'MockApiSwitch' },
-      { label: 'Environment Switch', screen: 'EnvironmentSwitch' },
-      { label: 'Debug Screen', screen: 'DebugScreen' },
-      { label: 'Performance Monitor', screen: 'PerformanceMonitor' },
-      { label: 'Network Inspector', screen: 'NetworkInspector' },
-      { label: 'UI States (QA)', screen: 'UiStatesDemo' },
-    ],
-  },
-  {
-    title: 'Family & trusted circle',
-    items: [
-      { label: 'Trusted Circle', screen: 'TrustedCircle' },
-      { label: 'Invite Contact', screen: 'InviteContact' },
-      { label: 'Trusted Contacts', screen: 'TrustedContacts' },
-      { label: 'Emergency Contacts', screen: 'EmergencyContacts' },
-      { label: 'Circle Permissions', screen: 'CirclePermissions' },
-      { label: 'Emergency Sharing', screen: 'EmergencySharing' },
-      { label: 'Wellness Sharing', screen: 'WellnessSharing' },
-      { label: 'Guardian View', screen: 'GuardianView' },
-      { label: 'Caregiver Dashboard', screen: 'CaregiverDashboard' },
-    ],
-  },
-  {
-    title: 'Care & personalization',
-    items: [
-      { label: 'Wellness Reports', screen: 'WellnessReportsHub' },
-      { label: 'Wellness Dashboard', screen: 'WellnessReportsDashboard' },
-      { label: 'Export Wellness Data', screen: 'ReportExportData' },
-      { label: 'Institution Reports', screen: 'InstitutionReports' },
-      { label: 'Parent Reports', screen: 'ParentReports' },
-      { label: 'Progress Dashboard', screen: 'ProgressDashboard' },
-      { label: 'Badge Collection', screen: 'BadgeCollection' },
-      { label: 'Weekly Challenges', screen: 'WeeklyChallenges' },
-      { label: 'Monthly Goals', screen: 'MonthlyGoals' },
-      { label: 'Rewards', screen: 'EngagementRewards' },
-      { label: 'Growth Timeline', screen: 'MilestoneTimeline' },
-      { label: 'Wellness Journey', screen: 'WellnessJourney' },
-      { label: 'Habit Tracking', screen: 'HabitTracking' },
-      { label: 'Personal Insights', screen: 'PersonalInsights' },
-      { label: 'Recommendation Feed', screen: 'RecommendationFeed' },
-      { label: 'Customize Dashboard', screen: 'DashboardCustomize' },
-      { label: 'Journal', screen: 'JournalHome' },
-      { label: 'Wellness Hub', screen: 'WellnessHub' },
-    ],
-  },
-  {
-    title: 'Account',
-    items: [
-      { label: 'AI Companion Settings', screen: 'AiCompanionSettings' },
-      { label: 'Conversation History', screen: 'ConversationHistory' },
-      { label: 'AI Memory', screen: 'AiMemoryViewer' },
-      { label: 'AI Timeline', screen: 'AiTimeline' },
-      { label: 'Conversation Templates', screen: 'ConversationTemplates' },
-      { label: 'Notification Center', screen: 'NotificationCenter' },
-      { label: 'Activity Timeline', screen: 'ActivityTimeline' },
-      { label: 'Privacy & Security', screen: 'PrivacySecurity' },
-    ],
-  },
-  {
-    title: 'Preferences',
-    items: [
-      { label: 'Search', screen: 'AppSearch' },
-      { label: 'Appearance', screen: 'Appearance' },
-      { label: 'Language', screen: 'Language' },
-      { label: 'Settings', screen: 'Settings' },
-    ],
-  },
-  {
-    title: 'Billing',
-    items: [
-      { label: 'Billing History', screen: 'BillingHistory' },
-      { label: 'Wallet', screen: 'Wallet' },
-      { label: 'Refunds', screen: 'Refunds' },
-    ],
-  },
-  {
-    title: 'Support',
-    items: [
-      { label: 'Help Center', screen: 'HelpCenter' },
-      { label: 'Account Management', screen: 'AccountManagement' },
-    ],
-  },
-];
+const LANGUAGES = ['English', 'Hindi', 'Telugu', 'Tamil', 'Kannada', 'Malayalam', 'Marathi', 'Bengali'];
 
 export const ProfileScreen: React.FC = () => {
-  const navigation = useNavigation<ProfileNav>();
+  const navigation = useNavigation<NavigationProp>();
   const logout = useAuthStore((s) => s.logout);
+
   const personalInfo = useProfileStore((s) => s.personalInfo);
-  const status = useProfileStore((s) => s.status);
-  const initialize = useProfileStore((s) => s.initialize);
-  const isHydrated = useProfileStore((s) => s.isHydrated);
-  const [logoutVisible, setLogoutVisible] = useState(false);
+  const updatePersonalInfo = useProfileStore((s) => s.updatePersonalInfo);
+  const savePersonalInfo = useProfileStore((s) => s.savePersonalInfo);
+
+  // Form States
+  const [fullName, setFullName] = useState(personalInfo.fullName || '');
+  const [email] = useState(personalInfo.email || '');
+  const [phone, setPhone] = useState(personalInfo.phone || '');
+  const [dob, setDob] = useState(personalInfo.dateOfBirth || '');
+  const [selectedLanguage, setSelectedLanguage] = useState('English');
+
+  const [emergencyName, setEmergencyName] = useState(personalInfo.emergencyContactName || '');
+  const [emergencyPhone, setEmergencyPhone] = useState(personalInfo.emergencyContact || '');
+
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savingEmergency, setSavingEmergency] = useState(false);
 
   useEffect(() => {
-    if (isHydrated && status === 'idle') {
-      void initialize();
+    async function loadProfile() {
+      try {
+        const res = await profileRepository.getMobileMe();
+        if (res && res.name) {
+          setFullName(res.name);
+        }
+      } catch {
+        // Fallback
+      }
     }
-  }, [initialize, isHydrated, status]);
+    void loadProfile();
+  }, []);
 
-  const completion = useMemo(
-    () => computeProfileCompletion(personalInfo),
-    [personalInfo],
-  );
+  const handleSavePersonalInfo = async () => {
+    setSaving(true);
+    void hapticLight();
+    try {
+      updatePersonalInfo({
+        fullName,
+        phone,
+        dateOfBirth: dob,
+      });
+      await savePersonalInfo();
+      void hapticSuccess();
+      Alert.alert('Profile Saved', 'Your personal details have been updated.');
+    } catch {
+      void hapticError();
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  const age =
-    personalInfo.age ||
-    (ageFromDateOfBirth(personalInfo.dateOfBirth)?.toString() ?? '');
+  const handleSaveEmergency = async () => {
+    setSavingEmergency(true);
+    void hapticLight();
+    try {
+      updatePersonalInfo({
+        emergencyContactName: emergencyName,
+        emergencyContact: emergencyPhone,
+      });
+      await savePersonalInfo();
+      void hapticSuccess();
+      Alert.alert('Saved', 'Emergency contact updated.');
+    } catch {
+      void hapticError();
+    } finally {
+      setSavingEmergency(false);
+    }
+  };
 
-  const subtitleParts = [
-    personalInfo.username ? `@${personalInfo.username}` : null,
-    age ? `${age} yrs` : null,
-    personalInfo.gender || null,
-    personalInfo.institution || null,
-  ].filter(Boolean);
+  const handleSignOut = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out of Hey Attrangi?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: () => {
+          void hapticLight();
+          logout();
+        },
+      },
+    ]);
+  };
 
-  const showSkeleton =
-    (status === 'loading' || status === 'idle') && !personalInfo.fullName;
+  const canGoBack = navigation.canGoBack();
 
   return (
-    <AppScreen gradient="topRightWarm">
-      <Text style={styles.title} accessibilityRole="header">
-        Profile
-      </Text>
-      <Text style={styles.subtitle}>Manage your profile</Text>
+    <Screen backgroundColor={Colors.background}>
+      <View style={styles.header}>
+        {canGoBack ? (
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => {
+              void hapticLight();
+              navigation.goBack();
+            }}
+          >
+            <Icon name={AppIcons.back} size={20} color={Colors.textPrimary} />
+          </TouchableOpacity>
+        ) : null}
+        <Text variant="heading1" style={styles.headerTitle}>
+          Profile Settings
+        </Text>
+      </View>
 
-      {showSkeleton ? (
-        <SkeletonProfileHub />
-      ) : (
-        <>
-          <ProfileCard
-            name={personalInfo.fullName || 'Your name'}
-            email={personalInfo.email}
-            phone={personalInfo.phone}
-            subtitle={subtitleParts.join(' · ')}
-            imageUrl={personalInfo.profileImageUrl}
-            onPress={() => navigation.navigate('PersonalInformation')}
-            style={styles.card}
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        {/* User Identity Card */}
+        <Card variant="default" style={styles.identityCard}>
+          <View style={styles.identityRow}>
+            <Avatar size={64} backgroundColor={Colors.brandLight}>
+              <Text variant="heading1" color={Colors.brandPrimary}>
+                {(fullName || 'User').charAt(0).toUpperCase()}
+              </Text>
+            </Avatar>
+            <View style={styles.identityMeta}>
+              <Text variant="heading2" style={styles.userName}>
+                {fullName || 'Patient User'}
+              </Text>
+              <Text variant="bodyMedium" color={Colors.textSecondary}>
+                {email || 'patient@heyattrangi.app'}
+              </Text>
+              <View style={styles.badgeRow}>
+                <Badge variant="brand" label="FREE PLAN" />
+                <Badge variant="teal" label="PATIENT" />
+              </View>
+            </View>
+          </View>
+        </Card>
+
+        {/* Personal Details Form */}
+        <Card variant="default" style={styles.sectionCard}>
+          <Text variant="heading3" style={styles.sectionTitle}>
+            Personal Details
+          </Text>
+
+          <Input
+            label="Full Name"
+            placeholder="Enter your name"
+            value={fullName}
+            onChangeText={setFullName}
           />
 
-          {personalInfo.bio ? (
-            <View style={styles.bioCard} accessibilityLabel={`Bio: ${personalInfo.bio}`}>
-              <Text style={styles.bioLabel}>Bio</Text>
-              <Text style={styles.bioText} maxFontSizeMultiplier={1.4}>
-                {personalInfo.bio}
+          <Input
+            label="Email Address"
+            placeholder="Email"
+            value={email}
+            editable={false}
+          />
+
+          <Input
+            label="Phone Number"
+            placeholder="+91 9876543210"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+          />
+
+          <Input
+            label="Date of Birth"
+            placeholder="YYYY-MM-DD"
+            value={dob}
+            onChangeText={setDob}
+          />
+
+          <Button
+            variant="primary"
+            label={saving ? 'Saving...' : 'Save Changes'}
+            onPress={handleSavePersonalInfo}
+            disabled={saving}
+          />
+        </Card>
+
+        {/* Emergency Contact */}
+        <Card variant="default" style={styles.sectionCard}>
+          <Text variant="heading3" style={styles.sectionTitle}>
+            Emergency Contact
+          </Text>
+          <Text variant="bodyMedium" color={Colors.textSecondary}>
+            Trusted person to notify in case of crisis support.
+          </Text>
+
+          <Input
+            label="Contact Name"
+            placeholder="e.g. Spouse / Parent"
+            value={emergencyName}
+            onChangeText={setEmergencyName}
+          />
+
+          <Input
+            label="Phone Number"
+            placeholder="+91 9876543210"
+            value={emergencyPhone}
+            onChangeText={setEmergencyPhone}
+            keyboardType="phone-pad"
+          />
+
+          <Button
+            variant="secondary"
+            label={savingEmergency ? 'Saving...' : 'Save Emergency Contact'}
+            onPress={handleSaveEmergency}
+            disabled={savingEmergency}
+          />
+        </Card>
+
+        {/* Preferences & Language */}
+        <Card variant="default" style={styles.sectionCard}>
+          <Text variant="heading3" style={styles.sectionTitle}>
+            App Preferences
+          </Text>
+
+          <Text variant="caption" color={Colors.textMuted} style={styles.subHeading}>
+            PREFERRED LANGUAGE
+          </Text>
+
+          <View style={styles.chipGrid}>
+            {LANGUAGES.map((lang) => {
+              const isSelected = selectedLanguage === lang;
+              return (
+                <Chip
+                  key={lang}
+                  label={lang}
+                  selected={isSelected}
+                  onPress={() => {
+                    void hapticSelection();
+                    setSelectedLanguage(lang);
+                  }}
+                />
+              );
+            })}
+          </View>
+
+          <Divider />
+
+          <View style={styles.switchRow}>
+            <View style={styles.switchTextCol}>
+              <Text variant="heading3" style={styles.switchLabel}>
+                Push Notifications
+              </Text>
+
+              <Text variant="bodyMedium" color={Colors.textSecondary}>
+                Daily wellness check-ins & reflection reminders
               </Text>
             </View>
-          ) : null}
 
-          <ProfileCompletionBar
-            percent={completion.percent}
-            missing={completion.missing}
-          />
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={(val) => {
+                void hapticLight();
+                setNotificationsEnabled(val);
+              }}
+              trackColor={{ false: Colors.borderDefault, true: Colors.brandLight }}
+              thumbColor={notificationsEnabled ? Colors.brandPrimary : Colors.surface}
+            />
+          </View>
+        </Card>
 
-          <PrimaryButton
-            label="Edit Profile"
-            onPress={() => navigation.navigate('PersonalInformation')}
-            style={styles.editCta}
-          />
-
-          {MENU_SECTIONS.map((section) => {
-            const designCore = section.title === 'Profile';
-            return (
-              <View key={section.title} style={styles.section}>
-                {designCore ? null : (
-                  <Text style={styles.sectionTitle}>{section.title}</Text>
-                )}
-                <View style={designCore ? styles.designMenu : styles.menu}>
-                  {section.items.map((item, index) => (
-                    <SettingsItem
-                      key={`${section.title}-${item.screen}`}
-                      label={item.label}
-                      showDivider={designCore ? true : index > 0}
-                      showChevron={!designCore}
-                      onPress={() =>
-                        navigation.navigate(item.screen as never)
-                      }
-                    />
-                  ))}
-                  {designCore ? <View style={styles.designMenuEnd} /> : null}
-                </View>
-              </View>
-            );
-          })}
-
-          <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={() => setLogoutVisible(true)}
-            activeOpacity={0.7}
-            {...buttonA11y('Log out')}
-          >
-            <Icon name={Icons.logout} size={20} color={Colors.error} />
-            <Text style={styles.logoutText}>Log Out</Text>
-          </TouchableOpacity>
-        </>
-      )}
-
-      <LogoutDialog
-        visible={logoutVisible}
-        onCancel={() => setLogoutVisible(false)}
-        onConfirm={() => {
-          setLogoutVisible(false);
-          void logout();
-        }}
-      />
-    </AppScreen>
+        {/* Sign Out CTA */}
+        <Button
+          variant="secondary"
+          label="Sign Out"
+          onPress={handleSignOut}
+          style={styles.signOutBtn}
+        />
+      </ScrollView>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  title: {
-    ...Typography.heading1,
-    color: Colors.textPrimary,
-    fontWeight: '700',
-  },
-  subtitle: {
-    ...Typography.subtitle,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
-    marginBottom: Spacing.xl,
-  },
-  card: {
-    marginBottom: Spacing.md,
-  },
-  bioCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xlarge,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
-  },
-  bioLabel: {
-    ...Typography.caption,
-    color: Colors.textMuted,
-    marginBottom: 4,
-    fontWeight: '600',
-  },
-  bioText: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-  },
-  editCta: {
-    marginBottom: Spacing.xl,
-  },
-  section: {
-    marginBottom: Spacing.lg,
-  },
-  sectionTitle: {
-    ...Typography.caption,
-    color: Colors.textMuted,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: Spacing.sm,
-  },
-  menu: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xlarge,
-    paddingHorizontal: Spacing.lg,
-  },
-  /** Design Profile.png — flat divider list, no card chrome / chevrons */
-  designMenu: {
-    marginTop: Spacing.sm,
-  },
-  designMenuEnd: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.borderDefault,
-  },
-  logoutButton: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.lg,
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.xl,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+    gap: Spacing.sm,
   },
-  logoutText: {
-    ...Typography.body,
-    color: Colors.error,
-    fontWeight: '600',
-    marginLeft: Spacing.sm,
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.borderDefault,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+  },
+  container: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    paddingBottom: Spacing.xl,
+    gap: Spacing.md,
+  },
+  identityCard: {
+    padding: Spacing.lg,
+  },
+  identityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  identityMeta: {
+    flex: 1,
+    gap: 2,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+  },
+  sectionCard: {
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  subHeading: {
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  chipGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  switchTextCol: {
+    flex: 1,
+    gap: 2,
+    marginRight: Spacing.md,
+  },
+  switchLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  signOutBtn: {
+    marginTop: Spacing.sm,
+    borderColor: Colors.error,
   },
 });

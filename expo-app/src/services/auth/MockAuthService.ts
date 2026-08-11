@@ -122,6 +122,31 @@ export class MockAuthService implements IAuthService {
     return mockDelay(successResponse(mockOtpSendResult()), 400);
   }
 
+  async sendEmailOtp(email: string) {
+    currentUser = {
+      ...currentUser,
+      email,
+    };
+    return mockDelay(successResponse(mockOtpSendResult()), 400);
+  }
+
+  async verifyEmailOtp(email: string, _otp: string) {
+    currentUser = {
+      ...currentUser,
+      email,
+      onboardingCompleted: true,
+    };
+    return mockDelay(
+      successResponse({
+        accessToken: 'mock-email-otp-access-token',
+        refreshToken: 'mock-refresh-token',
+        userId: currentUser.id,
+        isReturningUser: true,
+      } satisfies AuthSession),
+      500,
+    );
+  }
+
   async getMe() {
     return mockDelay(successResponse({ ...currentUser }));
   }

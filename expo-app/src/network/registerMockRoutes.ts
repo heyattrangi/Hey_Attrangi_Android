@@ -16,7 +16,7 @@ import { UnauthorizedError, ValidationError } from '../types/errors';
  * When `API_BASE_URL` becomes a real host, these handlers are unused.
  */
 export function registerMockRoutes(adapter: MockHttpAdapter): MockHttpAdapter {
-  adapter.on('POST', '/auth/login', async (config) => {
+  adapter.on('POST', '/api/mobile/auth/login', async (config) => {
     const body = (config.body ?? {}) as { email?: string; phone?: string; password?: string };
     const res = await mockAuthService.login({
       emailOrPhone: body.email ?? body.phone ?? '',
@@ -24,61 +24,112 @@ export function registerMockRoutes(adapter: MockHttpAdapter): MockHttpAdapter {
     });
     if (!res.success) throw res.error ?? new ValidationError('Login failed');
     const dto: BackendAuthResponse = {
-      token: res.data.accessToken,
+      accessToken: res.data.accessToken,
+      refreshToken: res.data.refreshToken ?? `refresh_${res.data.userId}`,
+      expiresIn: 86400,
       needsOnboarding: !res.data.isReturningUser,
       user: {
         id: res.data.userId,
         name: 'User',
         email: body.email ?? '',
-        role: 'user',
+        role: 'PATIENT',
         onboardingCompleted: res.data.isReturningUser,
         phone: body.phone ?? null,
-        age: null,
-        gender: null,
-        profilePhoto: null,
       },
     };
     return dto;
   });
 
-  adapter.on('POST', '/auth/refresh', async (config) => {
+  adapter.on('POST', '/api/mobile/auth/register', async (config) => {
+    const body = (config.body ?? {}) as { name?: string; email?: string; password?: string };
+    const res = await mockAuthService.signUp({
+      name: body.name ?? 'New User',
+      phone: '0000000000',
+      countryCode: '+91',
+      password: body.password ?? '',
+      otpDigits: ['0', '0', '0', '0', '0', '0'],
+    });
+    if (!res.success) throw res.error ?? new ValidationError('Registration failed');
+    const dto: BackendAuthResponse = {
+      accessToken: res.data.accessToken,
+      refreshToken: res.data.refreshToken ?? `refresh_${res.data.userId}`,
+      expiresIn: 86400,
+      needsOnboarding: !res.data.isReturningUser,
+      user: {
+        id: res.data.userId,
+        name: body.name ?? 'New User',
+        email: body.email ?? '',
+        role: 'PATIENT',
+        onboardingCompleted: res.data.isReturningUser,
+      },
+    };
+    return dto;
+  });
+
+  adapter.on('POST', '/api/mobile/auth/refresh', async (config) => {
     const body = (config.body ?? {}) as { refreshToken?: string };
     if (!body.refreshToken) throw new UnauthorizedError('Missing refresh token');
-    // Frontend-ready: mint a new access token from refresh (mock)
     return {
       accessToken: `refreshed_${body.refreshToken.slice(0, 8)}_${Date.now()}`,
       refreshToken: body.refreshToken,
+      expiresIn: 86400,
     };
   });
 
-  adapter.on('POST', '/auth/logout', async () => {
+  adapter.on('POST', '/api/mobile/auth/logout', async () => {
     await mockAuthService.logout();
     return { ok: true };
   });
 
-  adapter.on('GET', '/auth/me', async () => {
+  adapter.on('POST', '/api/mobile/auth/otp/send', async (config) => {
+    const body = (config.body ?? {}) as { email?: string };
+    if (!body.email) throw new ValidationError('Email is required');
+    await mockAuthService.sendEmailOtp(body.email);
+    return { success: true, message: 'OTP sent to your email' };
+  });
+
+  adapter.on('POST', '/api/mobile/auth/otp/verify', async (config) => {
+    const body = (config.body ?? {}) as { email?: string; otp?: string };
+    if (!body.email || !body.otp) throw new ValidationError('Email and OTP are required');
+    const res = await mockAuthService.verifyEmailOtp(body.email, body.otp);
+    if (!res.success) throw res.error ?? new ValidationError('OTP verification failed');
+    const dto: BackendAuthResponse = {
+      accessToken: res.data.accessToken,
+      refreshToken: res.data.refreshToken ?? `refresh_${res.data.userId}`,
+      expiresIn: 86400,
+      needsOnboarding: !res.data.isReturningUser,
+      user: {
+        id: res.data.userId,
+        name: 'Email OTP User',
+        email: body.email,
+        role: 'PATIENT',
+        onboardingCompleted: res.data.isReturningUser,
+      },
+    };
+    return dto;
+  });
+
+  adapter.on('GET', '/api/mobile/auth/me', async () => {
     const res = await mockAuthService.getMe();
     if (!res.success) throw res.error ?? new UnauthorizedError();
     return res.data;
   });
 
-  adapter.on('POST', '/auth/google', async (config) => {
+  adapter.on('POST', '/api/mobile/auth/google', async (config) => {
     const body = (config.body ?? {}) as { idToken?: string };
     const res = await mockAuthService.loginWithGoogle(body.idToken ?? '');
     if (!res.success) throw res.error ?? new ValidationError('Google login failed');
     return mapAuthResponse({
-      token: res.data.accessToken,
+      accessToken: res.data.accessToken,
+      refreshToken: res.data.refreshToken ?? `refresh_${res.data.userId}`,
+      expiresIn: 86400,
       needsOnboarding: !res.data.isReturningUser,
       user: {
         id: res.data.userId,
-        name: 'User',
-        email: '',
-        role: 'user',
+        name: 'Google User',
+        email: 'google@example.com',
+        role: 'PATIENT',
         onboardingCompleted: res.data.isReturningUser,
-        phone: null,
-        age: null,
-        gender: null,
-        profilePhoto: null,
       },
     });
   });

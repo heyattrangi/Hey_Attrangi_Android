@@ -42,7 +42,7 @@ export const HomeQuickActions = memo<HomeQuickActionsProps>(({
         onPress={onExploreTherapists}
       />
       <ExploreCard
-        title="Talk to Pragya AI"
+        title="Talk to Hey Attrangi"
         subtitle="Chat with your companion"
         icon={Icons.sparkles}
         iconColor={Colors.accentYellow}

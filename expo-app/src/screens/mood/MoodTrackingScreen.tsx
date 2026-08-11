@@ -1,443 +1,472 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
-  Text,
+  TouchableOpacity,
+  ScrollView,
   TextInput,
-  Pressable,
-  Platform,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
-import { AppScreen, AppCard } from '../../components/app';
-import { PillButton } from '../../components/ui/PillButton';
-import { PrimaryButton } from '../../components/ui/PrimaryButton';
-import { SecondaryButton } from '../../components/ui/SecondaryButton';
-import { MoodSavedState } from '../../components/ui-states';
-import {
-  IntensitySlider,
-  MetricScale,
-  StreakBanner,
-} from '../../components/mood';
+import Svg, { Rect, Path } from 'react-native-svg';
+import { Icon, AppIcons } from '../../components/app/Icon';
+import { moodRepository, MoodAnalyticsData } from '../../repositories/MoodRepository';
 import { useMoodStore } from '../../store/moodStore';
-import { useUiStore } from '../../store/uiStore';
 import { MainStackParamList, MainTabParamList } from '../../navigation/types';
 import {
+  Screen,
+  Text,
+  Button,
+  Card,
+  Badge,
+  Chip,
   Colors,
   Typography,
   Spacing,
-  Radius,
+  Radii,
   Shadows,
-  Motion,
-} from '../../app/design-system';
-import { computeMoodAnalytics } from '../../services/mood/moodAnalytics';
-import { hapticSelection } from '../../utils/haptics';
+} from '../../design-system';
+import { hapticError, hapticLight, hapticSuccess } from '../../utils/haptics';
 
 type MoodNav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'MoodTab'>,
   NativeStackNavigationProp<MainStackParamList>
 >;
 
-const QUOTE =
-  "You don't have to control your thoughts. You just have to stop letting them control you.";
+interface MoodConfig {
+  label: string;
+  background: string;
+  primary: string;
+  muted: string;
+  face: {
+    eyeLeft: { x: number; y: number; width: number; height: number; rx: number };
+    eyeRight: { x: number; y: number; width: number; height: number; rx: number };
+    mouthD: string;
+  };
+}
 
-/** Design: Mood tracker (scrollable).png — Daily Mood Check-In */
+const MOOD_CONFIG: Record<number, MoodConfig> = {
+  0: {
+    label: 'SAD',
+    background: '#F3E8FF',
+    primary: '#4D179A',
+    muted: 'rgba(77, 23, 154, 0.3)',
+    face: {
+      eyeLeft: { x: 50, y: 43, width: 50, height: 18, rx: 9 },
+      eyeRight: { x: 140, y: 43, width: 50, height: 18, rx: 9 },
+      mouthD: 'M 85,120 Q 120,88 155,120',
+    },
+  },
+  1: {
+    label: 'BAD',
+    background: '#E0F2FE',
+    primary: '#024A70',
+    muted: 'rgba(2, 74, 112, 0.3)',
+    face: {
+      eyeLeft: { x: 51, y: 31, width: 48, height: 48, rx: 24 },
+      eyeRight: { x: 141, y: 31, width: 48, height: 48, rx: 24 },
+      mouthD: 'M 85,120 Q 120,88 155,120',
+    },
+  },
+  2: {
+    label: 'NOT BAD',
+    background: '#FFF3E8',
+    primary: '#733E0A',
+    muted: 'rgba(115, 62, 10, 0.3)',
+    face: {
+      eyeLeft: { x: 50, y: 43, width: 50, height: 18, rx: 9 },
+      eyeRight: { x: 140, y: 43, width: 50, height: 18, rx: 9 },
+      mouthD: 'M 85,110 L 155,110',
+    },
+  },
+  3: {
+    label: 'GOOD',
+    background: '#ECFDF5',
+    primary: '#132D0E',
+    muted: 'rgba(19, 45, 14, 0.3)',
+    face: {
+      eyeLeft: { x: 51, y: 31, width: 48, height: 48, rx: 24 },
+      eyeRight: { x: 141, y: 31, width: 48, height: 48, rx: 24 },
+      mouthD: 'M 85,95 Q 120,130 155,95',
+    },
+  },
+  4: {
+    label: 'HAPPY',
+    background: '#FEF9C3',
+    primary: '#733E0A',
+    muted: 'rgba(115, 62, 10, 0.3)',
+    face: {
+      eyeLeft: { x: 50, y: 43, width: 50, height: 18, rx: 9 },
+      eyeRight: { x: 140, y: 43, width: 50, height: 18, rx: 9 },
+      mouthD: 'M 80,95 Q 120,135 160,95',
+    },
+  },
+};
+
+const MOOD_NAMES = ['Sad', 'Bad', 'Not bad', 'Good', 'Happy'];
+
 export const MoodTrackingScreen: React.FC = () => {
   const navigation = useNavigation<MoodNav>();
   const addLog = useMoodStore((s) => s.addLog);
-  const trackerMoods = useMoodStore((s) => s.trackerMoods);
-  const moodTags = useMoodStore((s) => s.moodTags);
-  const history = useMoodStore((s) => s.history);
-  const showToast = useUiStore((s) => s.showToast);
 
-  const [mood, setMood] = useState('okay');
-  const [intensity, setIntensity] = useState(5);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [customTag, setCustomTag] = useState('');
-  const [notes, setNotes] = useState('');
-  const [gratitude, setGratitude] = useState('');
-  const [energy, setEnergy] = useState<number | null>(null);
-  const [stress, setStress] = useState<number | null>(null);
-  const [sleep, setSleep] = useState<number | null>(null);
-  const [social, setSocial] = useState<number | null>(null);
-  const [productivity, setProductivity] = useState<number | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [score, setScore] = useState<number>(2);
+  const [note, setNote] = useState<string>('');
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState<string>('All');
 
-  const streak = computeMoodAnalytics(history).streak;
+  const [analytics, setAnalytics] = useState<MoodAnalyticsData | null>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const today = new Date().toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  const activeMood = MOOD_CONFIG[score] || MOOD_CONFIG[2];
 
-  const toggleTag = (tag: string) => {
-    void hapticSelection();
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
-    );
-  };
-
-  const addCustomTag = () => {
-    const trimmed = customTag.trim();
-    if (trimmed && !selectedTags.includes(trimmed)) {
-      void hapticSelection();
-      setSelectedTags((prev) => [...prev, trimmed]);
-      setCustomTag('');
+  const fetchAnalytics = useCallback(async () => {
+    setLoadingAnalytics(true);
+    try {
+      const data = await moodRepository.getAnalytics(filter);
+      setAnalytics(data);
+    } catch {
+      setAnalytics(null);
+    } finally {
+      setLoadingAnalytics(false);
     }
-  };
+  }, [filter]);
 
-  const handleSave = async () => {
-    const moodLabel = trackerMoods.find((m) => m.id === mood)?.label ?? mood;
+  useEffect(() => {
+    void fetchAnalytics();
+  }, [fetchAnalytics]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchAnalytics();
+    setRefreshing(false);
+  }, [fetchAnalytics]);
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    void hapticLight();
     try {
       await addLog({
-        mood,
-        moodLabel,
-        intensity,
-        tags: selectedTags,
-        notes: notes.trim() || null,
-        gratitude: gratitude.trim() || null,
-        energy,
-        stress,
-        sleep,
-        social,
-        productivity,
+        mood: activeMood.label.toLowerCase(),
+        moodLabel: activeMood.label,
+        intensity: score + 1,
+        tags: [],
+        notes: note.trim() || null,
+        gratitude: null,
+        energy: null,
+        stress: null,
+        sleep: null,
       });
-      setSaved(true);
+      void hapticSuccess();
+      setNote('');
+      void fetchAnalytics();
     } catch {
-      const message =
-        useMoodStore.getState().error?.message ?? 'Failed to save mood log';
-      showToast(message, 'error');
+      void hapticError();
+    } finally {
+      setSaving(false);
     }
   };
 
-  if (saved) {
-    return (
-      <AppScreen scrollable={false} gradient="topRightWarm">
-        <MoodSavedState
-          onViewHistory={() => navigation.navigate('MoodHistory')}
-        />
-      </AppScreen>
-    );
-  }
-
   return (
-    <AppScreen gradient="topRightWarm">
-      <View style={styles.headerRow}>
-        <View style={styles.headerText}>
-          <Text style={styles.title} maxFontSizeMultiplier={1.3}>
-            Mood Tracker
-          </Text>
-          <Text style={styles.subtitle} maxFontSizeMultiplier={1.3}>
-            Understand your feelings one day at a time.
-          </Text>
-        </View>
-        <SecondaryButton
-          label="History"
-          onPress={() => navigation.navigate('MoodHistory')}
-          size="compact"
-        />
+    <Screen backgroundColor={activeMood.background}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            void hapticLight();
+            navigation.goBack();
+          }}
+        >
+          <Icon name={AppIcons.back} size={20} color={activeMood.primary} />
+        </TouchableOpacity>
+        <Text variant="heading1" style={[styles.headerTitle, { color: activeMood.primary }]}>
+          How is your Mood?
+        </Text>
       </View>
 
-      <View style={styles.quickLinks}>
-        <Pressable
-          style={styles.quickChip}
-          onPress={() => navigation.navigate('MoodAnalytics')}
-        >
-          <Text style={styles.quickChipText}>Analytics</Text>
-        </Pressable>
-        <Pressable
-          style={styles.quickChip}
-          onPress={() => navigation.navigate('MoodCalendar')}
-        >
-          <Text style={styles.quickChipText}>Calendar</Text>
-        </Pressable>
-      </View>
-
-      <Text style={styles.date} maxFontSizeMultiplier={1.25}>
-        {today}
-      </Text>
-      <Text style={styles.quote} maxFontSizeMultiplier={1.3}>
-        “{QUOTE}”
-      </Text>
-
-      {streak.currentStreak > 0 ? (
-        <View style={styles.streakWrap}>
-          <StreakBanner streak={streak} />
-        </View>
-      ) : null}
-
-      <Animated.View entering={FadeInDown.duration(Motion.duration.normal)}>
-        <AppCard style={styles.card}>
-          <Text style={styles.cardTitle} maxFontSizeMultiplier={1.3}>
-            How do you feel right now?
-          </Text>
-          <View style={styles.moodRow}>
-            {trackerMoods.map((option) => {
-              const selected = mood === option.id;
-              return (
-                <Animated.View
-                  key={option.id}
-                  entering={selected ? ZoomIn.duration(Motion.duration.fast) : undefined}
-                >
-                  <PillButton
-                    label={option.label}
-                    selected={selected}
-                    onPress={() => {
-                      void hapticSelection();
-                      setMood(option.id);
-                    }}
-                  />
-                </Animated.View>
-              );
-            })}
-          </View>
-          <IntensitySlider value={intensity} onChange={setIntensity} />
-        </AppCard>
-      </Animated.View>
-
-      <AppCard style={styles.card}>
-        <Text style={styles.cardTitle} maxFontSizeMultiplier={1.3}>
-          What’s going on with you today?
-        </Text>
-        <Text style={styles.cardHint} maxFontSizeMultiplier={1.25}>
-          Choose any that apply, or add your own tag.
-        </Text>
-        <View style={styles.tagRow}>
-          {moodTags.map((tag) => (
-            <PillButton
-              key={tag}
-              label={tag}
-              selected={selectedTags.includes(tag)}
-              onPress={() => toggleTag(tag)}
-            />
-          ))}
-          {selectedTags
-            .filter((t) => !moodTags.includes(t))
-            .map((tag) => (
-              <PillButton
-                key={tag}
-                label={tag}
-                selected
-                onPress={() => toggleTag(tag)}
-              />
-            ))}
-        </View>
-        <View style={styles.customRow}>
-          <TextInput
-            style={styles.customInput}
-            placeholder="Custom emotion"
-            placeholderTextColor={Colors.textMuted}
-            value={customTag}
-            onChangeText={setCustomTag}
-            onSubmitEditing={addCustomTag}
-            returnKeyType="done"
-            maxFontSizeMultiplier={1.3}
-            accessibilityLabel="Custom emotion tag"
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[activeMood.primary]}
+            tintColor={activeMood.primary}
           />
-          <Pressable
-            style={styles.addTagBtn}
-            onPress={addCustomTag}
-            accessibilityRole="button"
-            accessibilityLabel="Add custom tag"
-          >
-            <Text style={styles.addTagText}>+ Add</Text>
-          </Pressable>
+        }
+      >
+        {/* Animated Face Container */}
+        <View style={styles.faceCard}>
+          <Svg viewBox="0 0 240 160" style={styles.svgFace}>
+            <Rect
+              x={activeMood.face.eyeLeft.x}
+              y={activeMood.face.eyeLeft.y}
+              width={activeMood.face.eyeLeft.width}
+              height={activeMood.face.eyeLeft.height}
+              rx={activeMood.face.eyeLeft.rx}
+              fill={activeMood.primary}
+            />
+            <Rect
+              x={activeMood.face.eyeRight.x}
+              y={activeMood.face.eyeRight.y}
+              width={activeMood.face.eyeRight.width}
+              height={activeMood.face.eyeRight.height}
+              rx={activeMood.face.eyeRight.rx}
+              fill={activeMood.primary}
+            />
+            <Path
+              d={activeMood.face.mouthD}
+              fill="none"
+              stroke={activeMood.primary}
+              strokeWidth="12"
+              strokeLinecap="round"
+            />
+          </Svg>
+
+          <Text variant="heading1" style={[styles.moodLabel, { color: activeMood.primary }]}>
+            {activeMood.label}
+          </Text>
         </View>
-      </AppCard>
 
-      <AppCard style={styles.card}>
-        <Text style={styles.cardTitle} maxFontSizeMultiplier={1.3}>
-          Notes & gratitude
-        </Text>
-        <TextInput
-          style={[styles.notesInput, styles.notesTall]}
-          placeholder="How was your day? (optional)"
-          placeholderTextColor={Colors.textMuted}
-          value={notes}
-          onChangeText={setNotes}
-          multiline
-          textAlignVertical="top"
-          maxFontSizeMultiplier={1.35}
-          accessibilityLabel="Journal notes"
-        />
-        <TextInput
-          style={styles.notesInput}
-          placeholder="One thing you’re grateful for…"
-          placeholderTextColor={Colors.textMuted}
-          value={gratitude}
-          onChangeText={setGratitude}
-          maxFontSizeMultiplier={1.35}
-          accessibilityLabel="Gratitude prompt"
-        />
-      </AppCard>
+        {/* Mood Selector Buttons */}
+        <View style={styles.selectorRow}>
+          {MOOD_NAMES.map((name, idx) => {
+            const isSelected = score === idx;
+            return (
+              <TouchableOpacity
+                key={name}
+                style={[
+                  styles.moodBtn,
+                  isSelected && { backgroundColor: activeMood.primary },
+                ]}
+                onPress={() => {
+                  void hapticLight();
+                  setScore(idx);
+                }}
+              >
+                <Text
+                  variant="caption"
+                  style={[
+                    styles.moodBtnText,
+                    { color: isSelected ? Colors.white : activeMood.primary },
+                  ]}
+                >
+                  {name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-      <AppCard style={styles.card}>
-        <Text style={styles.cardTitle} maxFontSizeMultiplier={1.3}>
-          More details
-        </Text>
-        <MetricScale
-          title="How would you rate your energy today?"
-          value={energy}
-          onChange={setEnergy}
-        />
-        <MetricScale
-          title="How would you rate your stress today?"
-          value={stress}
-          onChange={setStress}
-        />
-        <MetricScale
-          title="How well did you sleep today?"
-          value={sleep}
-          onChange={setSleep}
-        />
-        <MetricScale
-          title="How was your social interaction today?"
-          value={social}
-          onChange={setSocial}
-        />
-        <MetricScale
-          title="How productive did you feel today?"
-          value={productivity}
-          onChange={setProductivity}
-        />
-      </AppCard>
+        {/* Note & Submit Form */}
+        <Card variant="default" style={styles.formCard}>
+          <TextInput
+            style={[styles.noteInput, { color: activeMood.primary }]}
+            placeholder="Add a note (optional)..."
+            placeholderTextColor={activeMood.muted}
+            value={note}
+            onChangeText={setNote}
+            multiline
+          />
 
-      <PrimaryButton label="Save Log" onPress={handleSave} style={styles.save} />
-    </AppScreen>
+          <Button
+            variant="primary"
+            label={saving ? 'Saving...' : 'Save Mood Log'}
+            onPress={handleSubmit}
+            loading={saving}
+            disabled={saving}
+            style={{ backgroundColor: activeMood.primary }}
+          />
+        </Card>
+
+        {/* Analytics Breakdown */}
+        <Card variant="elevated" style={styles.analyticsCard}>
+          <View style={styles.analyticsHeader}>
+            <Text variant="heading2" style={styles.analyticsTitle}>
+              Mood Analytics
+            </Text>
+
+            <View style={styles.filterPills}>
+              {['Today', 'Week', 'All'].map((f) => (
+                <TouchableOpacity
+                  key={f}
+                  style={[
+                    styles.filterPill,
+                    filter === f && { backgroundColor: activeMood.primary },
+                  ]}
+                  onPress={() => {
+                    void hapticLight();
+                    setFilter(f);
+                  }}
+                >
+                  <Text
+                    variant="caption"
+                    style={{ color: filter === f ? Colors.white : Colors.textSecondary }}
+                  >
+                    {f}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {loadingAnalytics ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="small" color={activeMood.primary} />
+            </View>
+          ) : analytics ? (
+            <View style={styles.analyticsBody}>
+              <View style={styles.scoreRow}>
+                <View>
+                  <Text variant="caption" color={Colors.textMuted}>
+                    OVERALL MENTAL HEALTH SCORE
+                  </Text>
+                  <Text variant="heading1" style={styles.scoreValue}>
+                    {analytics.score} / 100
+                  </Text>
+                </View>
+                <Badge variant="brand" label={analytics.message} />
+              </View>
+
+              <View style={styles.progressRow}>
+                <View style={styles.progressItem}>
+                  <Text variant="caption" color={Colors.textMuted}>HAPPY</Text>
+                  <Text variant="heading2" style={{ color: '#16A34A' }}>{analytics.happy}%</Text>
+                </View>
+                <View style={styles.progressItem}>
+                  <Text variant="caption" color={Colors.textMuted}>CALM</Text>
+                  <Text variant="heading2" style={{ color: '#0284C7' }}>{analytics.calm}%</Text>
+                </View>
+                <View style={styles.progressItem}>
+                  <Text variant="caption" color={Colors.textMuted}>SAD</Text>
+                  <Text variant="heading2" style={{ color: '#9333EA' }}>{analytics.sad}%</Text>
+                </View>
+              </View>
+            </View>
+          ) : null}
+        </Card>
+      </ScrollView>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  headerRow: {
+  header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  headerText: {
-    flex: 1,
-  },
-  title: {
-    ...Typography.heading1,
-    color: Colors.textPrimary,
-    fontWeight: '700',
-  },
-  subtitle: {
-    ...Typography.subtitle,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
-  },
-  quickLinks: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  quickChip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs + 2,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.calendarInactive,
-  },
-  quickChipText: {
-    ...Typography.caption,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-  },
-  date: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-  },
-  quote: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.lg,
-    lineHeight: 22,
-  },
-  streakWrap: {
-    marginBottom: Spacing.md,
-  },
-  card: {
-    marginBottom: Spacing.md,
-    ...Shadows.low,
-  },
-  cardTitle: {
-    ...Typography.title,
-    color: Colors.textPrimary,
-    fontWeight: '700',
-    marginBottom: Spacing.sm,
-  },
-  cardHint: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.md,
-  },
-  moodRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
-  },
-  tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  customRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
     alignItems: 'center',
-  },
-  customInput: {
-    flex: 1,
-    ...Typography.body,
-    color: Colors.textPrimary,
-    borderWidth: 1,
-    borderColor: Colors.borderDefault,
-    borderRadius: Radius.large,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Platform.OS === 'ios' ? Spacing.sm + 2 : Spacing.sm,
-    minHeight: 44,
-    backgroundColor: Colors.surface,
+    paddingTop: Spacing.sm,
+    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
   },
-  addTagBtn: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 2,
-    borderRadius: Radius.large,
-    borderWidth: 1,
-    borderColor: Colors.borderDefault,
-    minHeight: 44,
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  addTagText: {
-    ...Typography.label,
-    color: Colors.textPrimary,
-    fontWeight: '700',
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
   },
-  notesInput: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    borderWidth: 1,
-    borderColor: Colors.borderDefault,
-    borderRadius: Radius.large,
+  scrollContent: {
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingBottom: Spacing.xl,
+    gap: Spacing.md,
+  },
+  faceCard: {
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+  },
+  svgFace: {
+    width: 200,
+    height: 120,
+    marginBottom: Spacing.xs,
+  },
+  moodLabel: {
+    fontSize: 32,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+  selectorRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 4,
+  },
+  moodBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: Radii.pill,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    alignItems: 'center',
+  },
+  moodBtnText: {
+    fontWeight: '800',
+    fontSize: 11,
+  },
+  formCard: {
+    padding: Spacing.md,
+  },
+  noteInput: {
+    fontSize: 14,
+    minHeight: 60,
+    fontFamily: Typography.bodyMedium.fontFamily,
     marginBottom: Spacing.sm,
-    minHeight: 44,
-    backgroundColor: Colors.surface,
   },
-  notesTall: {
-    minHeight: 88,
+  analyticsCard: {
+    padding: Spacing.lg,
   },
-  save: {
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.xl,
+  analyticsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  analyticsTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  filterPills: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  filterPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Radii.pill,
+    backgroundColor: Colors.background,
+  },
+  loadingBox: {
+    paddingVertical: Spacing.lg,
+    alignItems: 'center',
+  },
+  analyticsBody: {
+    gap: Spacing.md,
+  },
+  scoreRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  scoreValue: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: Colors.textPrimary,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderDefault,
+    paddingTop: Spacing.sm,
+  },
+  progressItem: {
+    alignItems: 'center',
   },
 });

@@ -21,7 +21,7 @@ const COPY: Record<
 > = {
   recommendations: {
     title: 'No recommendations yet',
-    message: 'Pragya will suggest gentle next steps as you use Hey Attrangi.',
+    message: 'Hey Attrangi will suggest gentle next steps as you use the app.',
     icon: 'lightbulb-outline',
   },
   goals: {

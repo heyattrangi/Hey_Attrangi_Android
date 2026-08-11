@@ -5,11 +5,6 @@ import { ChatMessage } from '../../types/domain';
 import { IChatService } from './IChatService';
 import { mockChatService } from './MockChatService';
 
-/**
- * Real chat service — HTTP for sendMessage when API is live.
- * Intelligence surfaces (stream, memory, search, etc.) stay mock-backed
- * until the Conversation Engine endpoints ship.
- */
 export class RealChatService implements IChatService {
   getModes = mockChatService.getModes.bind(mockChatService);
   getSuggestedPrompts = mockChatService.getSuggestedPrompts.bind(mockChatService);
@@ -43,7 +38,14 @@ export class RealChatService implements IChatService {
     sessionId: string,
   ): Promise<ApiResponse<ChatMessage>> {
     try {
-      return successResponse(await chatRepository.sendMessage(text, modeId, sessionId));
+      const data = await chatRepository.sendMessage(text, sessionId);
+      const msg: ChatMessage = {
+        id: `ai_${Date.now()}`,
+        sender: 'ai',
+        text: data.reply || "Sorry, I didn't quite get that. Could you please rephrase?",
+        createdAt: new Date().toISOString(),
+      };
+      return successResponse(msg);
     } catch (error) {
       return failureResponse(normalizeServiceError(error));
     }

@@ -7,11 +7,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "scheme": "heyattrangi",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FFF8F0"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.heyaatrangi.expo",
@@ -49,11 +44,14 @@
           "resizeMode": "contain",
           "backgroundColor": "#FFF8F0"
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin",
+      "expo-audio",
+      "expo-asset"
     ],
     "extra": {
       "eas": {
-        "projectId": "replace-with-eas-project-id"
+        "projectId": "3a67b28b-2a0d-4222-8210-ebd19d11c8b5"
       },
       "privacyPolicyUrl": "https://heyattrangi.app/privacy",
       "termsOfServiceUrl": "https://heyattrangi.app/terms",
@@ -61,6 +59,7 @@
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "owner": "aatrangi-private-limited"
   }
 }

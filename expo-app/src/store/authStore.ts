@@ -22,6 +22,8 @@ interface AuthState {
     credentials?: LoginCredentials;
   }) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  sendEmailOtp: (email: string) => Promise<void>;
+  verifyEmailOtp: (email: string, otp: string) => Promise<void>;
   sendRegistrationOtp: (phone: string, countryCode?: string) => Promise<void>;
   verifyRegistrationOtp: (
     phone: string,
@@ -30,7 +32,7 @@ interface AuthState {
   ) => Promise<boolean>;
   resendRegistrationOtp: (phone: string, countryCode?: string) => Promise<void>;
   register: (payload: SignUpPayload) => Promise<void>;
-  completeOnboarding: () => Promise<void>;
+  completeOnboarding: (payload?: any) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -120,6 +122,38 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      sendEmailOtp: async (email: string) => {
+        set({ status: 'loading', error: null });
+        try {
+          const response = await getAuthService().sendEmailOtp(email);
+          if (!response.success) {
+            throw response.error ?? new Error('Failed to send email verification code');
+          }
+          set({ status: 'success', error: null });
+        } catch (error) {
+          const appError = normalizeServiceError(error);
+          set({ status: 'error', error: appError });
+          throw appError;
+        }
+      },
+
+      verifyEmailOtp: async (email: string, otp: string) => {
+        set({ status: 'loading', error: null });
+        try {
+          const response = await getAuthService().verifyEmailOtp(email, otp);
+          if (!response.success) {
+            throw response.error ?? new Error('Failed to verify code');
+          }
+          await applyAuthSession(response.data, set, {
+            hasCompletedOnboarding: response.data.isReturningUser,
+          });
+        } catch (error) {
+          const appError = normalizeServiceError(error);
+          set({ status: 'error', error: appError });
+          throw appError;
+        }
+      },
+
       sendRegistrationOtp: async (phone, countryCode = '+91') => {
         set({ status: 'loading', error: null });
         try {
@@ -204,17 +238,11 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      completeOnboarding: async () => {
+      completeOnboarding: async (payload?: any) => {
         try {
-          const response = await getAuthService().completeOnboarding();
-          if (response.success) {
-            set({
-              hasCompletedOnboarding: response.data.onboardingCompleted,
-            });
-            return;
-          }
+          await getAuthService().completeOnboarding(payload);
         } catch {
-          // Fall through to local completion if API call fails.
+          // Fall through to local completion
         }
         set({ hasCompletedOnboarding: true });
       },

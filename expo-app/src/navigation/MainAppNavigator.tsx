@@ -102,6 +102,8 @@ import {
   PerformanceMonitorScreen,
   NetworkInspectorScreen,
 } from '../screens/devtools';
+import { ProfileScreen } from '../screens/profile/ProfileScreen';
+import { ChatScreen } from '../screens/chat/ChatScreen';
 import { BiometricLoginScreen } from '../screens/profile/BiometricLoginScreen';
 import { HelpCenterScreen } from '../screens/profile/HelpCenterScreen';
 import { HelpArticleScreen } from '../screens/profile/HelpArticleScreen';
@@ -114,6 +116,9 @@ import { JournalHomeScreen } from '../screens/journal/JournalHomeScreen';
 import { JournalEntryScreen } from '../screens/journal/JournalEntryScreen';
 import { JournalTemplatesScreen } from '../screens/journal/JournalTemplatesScreen';
 import { WellnessHubScreen } from '../screens/wellness/WellnessHubScreen';
+import { AssessmentListScreen } from '../screens/assessments/AssessmentListScreen';
+import { AssessmentRunnerScreen } from '../screens/assessments/AssessmentRunnerScreen';
+import { AssessmentResultScreen } from '../screens/assessments/AssessmentResultScreen';
 import { BreathingExerciseScreen } from '../screens/wellness/BreathingExerciseScreen';
 import { AffirmationsScreen } from '../screens/wellness/AffirmationsScreen';
 import { WellnessProgressScreen } from '../screens/wellness/WellnessProgressScreen';
@@ -156,8 +161,13 @@ import {
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
-export const MainAppNavigator = () => (
-  <Stack.Navigator
+export const MainAppNavigator = () => {
+  React.useEffect(() => {
+    console.log('[ROOT NAV] MainAppNavigator mounted');
+  }, []);
+
+  return (
+    <Stack.Navigator
     screenOptions={{
       headerShown: false,
       animation: 'slide_from_right',
@@ -274,6 +284,10 @@ export const MainAppNavigator = () => (
     <Stack.Screen name="BiometricLogin" component={BiometricLoginScreen} />
     <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
     <Stack.Screen name="HelpArticle" component={HelpArticleScreen} />
+    <Stack.Screen name="Profile" component={ProfileScreen} />
+    <Stack.Screen name="ProfileTab" component={ProfileScreen} />
+    <Stack.Screen name="Chat" component={ChatScreen} />
+    <Stack.Screen name="ChatTab" component={ChatScreen} />
     <Stack.Screen name="AccountManagement" component={AccountManagementScreen} />
     <Stack.Screen name="MoodHistory" component={MoodHistoryScreen} />
     <Stack.Screen name="MoodAnalytics" component={MoodAnalyticsScreen} />
@@ -287,6 +301,9 @@ export const MainAppNavigator = () => (
     />
     <Stack.Screen name="JournalTemplates" component={JournalTemplatesScreen} />
     <Stack.Screen name="WellnessHub" component={WellnessHubScreen} />
+    <Stack.Screen name="AssessmentList" component={AssessmentListScreen} />
+    <Stack.Screen name="AssessmentRunner" component={AssessmentRunnerScreen} />
+    <Stack.Screen name="AssessmentResult" component={AssessmentResultScreen} />
     <Stack.Screen
       name="BreathingExercise"
       component={BreathingExerciseScreen}
@@ -356,3 +373,4 @@ export const MainAppNavigator = () => (
     <Stack.Screen name="UiStatesDemo" component={UiStatesDemoScreen} />
   </Stack.Navigator>
 );
+};

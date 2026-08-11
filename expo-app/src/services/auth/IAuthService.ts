@@ -21,6 +21,8 @@ export interface IAuthService {
     countryCode?: string,
   ): Promise<ApiResponse<OtpVerifyResult>>;
   resendOtp(phone: string, countryCode?: string): Promise<ApiResponse<OtpSendResult>>;
+  sendEmailOtp(email: string): Promise<ApiResponse<OtpSendResult>>;
+  verifyEmailOtp(email: string, otp: string): Promise<ApiResponse<AuthSession>>;
   getMe(): Promise<ApiResponse<AuthUser>>;
-  completeOnboarding(): Promise<ApiResponse<AuthUser>>;
+  completeOnboarding(payload?: any): Promise<ApiResponse<any>>;
 }

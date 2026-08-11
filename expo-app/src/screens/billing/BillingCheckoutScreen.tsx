@@ -11,8 +11,11 @@ import {
   BillingConfirmDialog,
   SkeletonPayment,
 } from '../../components/billing';
+import RazorpayCheckout from 'react-native-razorpay';
 import { useBillingStore } from '../../store/billingStore';
 import { useProfileStore } from '../../store/profileStore';
+import { billingRepository } from '../../repositories/BillingRepository';
+import { profileRepository } from '../../repositories/ProfileRepository';
 import { PaymentMethod } from '../../types/domain';
 import { MainStackParamList } from '../../navigation/types';
 import { Colors, Spacing, Typography } from '../../app/design-system';
@@ -81,6 +84,54 @@ export const BillingCheckoutScreen: React.FC<Props> = ({
   const pay = async () => {
     setConfirmOpen(false);
     try {
+      if (kind === 'subscription') {
+        const orderRes = await billingRepository.createSubscriptionOrder(
+          planId || 'essential',
+          total,
+        );
+
+        if (orderRes?.order?.id && orderRes?.key) {
+          const options = {
+            description: `${title} Subscription`,
+            image: 'https://heyattrangi.app/logo.png',
+            currency: 'INR',
+            key: orderRes.key,
+            amount: orderRes.order.amount,
+            name: 'Hey Attrangi',
+            order_id: orderRes.order.id,
+            prefill: {
+              email: 'patient@heyattrangi.app',
+              contact: '9876543210',
+              name: 'Patient',
+            },
+            theme: { color: Colors.primary },
+          };
+
+          const razorpayData: any = await RazorpayCheckout.open(options);
+
+          const verifyRes = await billingRepository.verifySubscription({
+            razorpay_order_id: razorpayData.razorpay_order_id,
+            razorpay_payment_id: razorpayData.razorpay_payment_id,
+            razorpay_signature: razorpayData.razorpay_signature,
+            plan: planId || 'essential',
+            amount: total,
+          });
+
+          if (verifyRes.success) {
+            await profileRepository.getMobileMe();
+            navigation.replace('PaymentSuccess', {
+              transactionId: verifyRes.transactionId || razorpayData.razorpay_payment_id,
+              receiptId: orderRes.order.id,
+              amountLabel: `₹${total}`,
+              title: 'Subscription updated',
+              kind: 'subscription',
+            });
+            return;
+          }
+        }
+      }
+
+      // Fallback checkout
       const result = await checkout({
         kind,
         planId,
@@ -96,10 +147,10 @@ export const BillingCheckoutScreen: React.FC<Props> = ({
         title: kind === 'subscription' ? 'Subscription updated' : 'Credits added',
         kind,
       });
-    } catch {
+    } catch (err: any) {
       setFailed(true);
       navigation.navigate('PaymentFailure', {
-        message: 'Mock checkout failed. Try another method or contact support.',
+        message: err?.message || 'Payment cancelled or failed. Please try again.',
       });
     }
   };

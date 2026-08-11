@@ -1,17 +1,16 @@
 import { BackendAuthResponse, BackendAuthUser } from '../data/dto';
 import { RefreshTokenResponseDto } from '../data/dto';
-import { mapAuthResponse } from '../data/mappers';
-import { AuthSession, AuthUser, LoginCredentials, SignUpPayload } from '../data/models';
+import { mapAuthResponse, phoneToSignupEmail } from '../data/mappers';
+import { AuthSession, AuthUser, LoginCredentials, OtpSendResult, SignUpPayload } from '../data/models';
+import { tokenManager } from '../auth/TokenManager';
 import { BaseRepository } from './base/BaseRepository';
 
 export class AuthRepository extends BaseRepository {
   async login(credentials: LoginCredentials): Promise<AuthSession> {
-    const isEmail = credentials.emailOrPhone.includes('@');
     const { data } = await this.http.post<BackendAuthResponse>(
-      '/auth/login',
+      '/api/mobile/auth/login',
       {
-        email: isEmail ? credentials.emailOrPhone : undefined,
-        phone: isEmail ? undefined : credentials.emailOrPhone,
+        email: credentials.emailOrPhone,
         password: credentials.password,
       },
       { skipAuth: true },
@@ -21,7 +20,7 @@ export class AuthRepository extends BaseRepository {
 
   async loginWithGoogle(idToken: string): Promise<AuthSession> {
     const { data } = await this.http.post<BackendAuthResponse>(
-      '/auth/google',
+      '/api/mobile/auth/google',
       { idToken },
       { skipAuth: true },
     );
@@ -30,43 +29,94 @@ export class AuthRepository extends BaseRepository {
 
   async refresh(refreshToken: string): Promise<RefreshTokenResponseDto> {
     const { data } = await this.http.post<RefreshTokenResponseDto>(
-      '/auth/refresh',
+      '/api/mobile/auth/refresh',
       { refreshToken },
       { skipAuth: true, skipRefresh: true },
     );
     return data;
   }
 
-  async logout(): Promise<void> {
-    await this.http.post('/auth/logout', {}, { skipRefresh: true });
+  async logout(refreshToken?: string): Promise<void> {
+    const tokenToRevoke = refreshToken ?? (await tokenManager.getRefreshToken()) ?? '';
+    await this.http.post(
+      '/api/mobile/auth/logout',
+      { refreshToken: tokenToRevoke },
+      { skipRefresh: true },
+    );
   }
 
   async getMe(): Promise<AuthUser> {
-    const { data } = await this.http.get<BackendAuthUser | AuthUser>('/auth/me');
-    // Mock adapter returns AuthUser; real API returns BackendAuthUser
-    if ('onboardingCompleted' in data && 'role' in data) {
-      return data as AuthUser;
-    }
-    const raw = data as BackendAuthUser;
+    const { data } = await this.http.get<BackendAuthUser | AuthUser | { user: BackendAuthUser }>('/api/mobile/auth/me');
+    const raw = ('user' in data && data.user ? data.user : data) as BackendAuthUser;
     return {
-      id: raw.id,
-      name: raw.name,
-      email: raw.email,
-      phone: raw.phone,
-      onboardingCompleted: raw.onboardingCompleted,
-      role: raw.role,
-      profilePhoto: raw.profilePhoto,
+      id: raw?.id ?? 'user_' + Date.now(),
+      name: raw?.name ?? '',
+      email: raw?.email ?? '',
+      phone: raw?.phone ?? null,
+      onboardingCompleted: raw?.onboardingCompleted ?? true,
+      role: raw?.role ?? 'user',
+      profilePhoto: raw?.profilePhoto ?? null,
     };
   }
 
-  async signUp(_payload: SignUpPayload): Promise<AuthSession> {
-    // Endpoint placeholder — wire when backend signup is live
+  async signUp(payload: SignUpPayload): Promise<AuthSession> {
+    const email = payload.email ?? phoneToSignupEmail(payload.phone, payload.countryCode);
     const { data } = await this.http.post<BackendAuthResponse>(
-      '/auth/signup',
-      _payload,
+      '/api/mobile/auth/register',
+      {
+        name: payload.name,
+        email,
+        password: payload.password,
+      },
       { skipAuth: true },
     );
     return mapAuthResponse(data);
+  }
+
+  async sendEmailOtp(email: string): Promise<OtpSendResult> {
+    try {
+      const { data } = await this.http.post<{ success: boolean; message?: string }>(
+        '/api/auth/send-otp',
+        { email },
+        { skipAuth: true },
+      );
+      return {
+        sent: Boolean(data.success),
+        expiresInSeconds: 600,
+        resendAvailableInSeconds: 30,
+        message: data.message ?? 'OTP sent to your email',
+      };
+    } catch {
+      const { data } = await this.http.post<{ success: boolean; message?: string }>(
+        '/api/mobile/auth/otp/send',
+        { email },
+        { skipAuth: true },
+      );
+      return {
+        sent: Boolean(data.success),
+        expiresInSeconds: 600,
+        resendAvailableInSeconds: 30,
+        message: data.message ?? 'OTP sent to your email',
+      };
+    }
+  }
+
+  async verifyEmailOtp(email: string, otp: string): Promise<AuthSession> {
+    try {
+      const { data } = await this.http.post<BackendAuthResponse>(
+        '/api/auth/verify-otp',
+        { email, otp },
+        { skipAuth: true },
+      );
+      return mapAuthResponse(data);
+    } catch {
+      const { data } = await this.http.post<BackendAuthResponse>(
+        '/api/mobile/auth/otp/verify',
+        { email, otp },
+        { skipAuth: true },
+      );
+      return mapAuthResponse(data);
+    }
   }
 
   async forgotPassword(email: string): Promise<{ message: string }> {
@@ -78,8 +128,17 @@ export class AuthRepository extends BaseRepository {
     return data;
   }
 
-  async completeOnboarding(): Promise<AuthUser> {
-    const { data } = await this.http.post<AuthUser>('/auth/onboarding/complete', {});
+  async completeOnboarding(payload?: {
+    name?: string;
+    age?: string;
+    dob?: string;
+    emergencyContact?: string;
+    emergencyPhone?: string;
+    preferredLanguage?: string;
+    heardAboutUs?: string;
+    healthConcerns?: string[];
+  }): Promise<{ success: boolean }> {
+    const { data } = await this.http.post<{ success: boolean }>('/api/onboarding/patient', payload ?? {});
     return data;
   }
 }

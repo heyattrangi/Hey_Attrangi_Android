@@ -8,51 +8,68 @@ import { useChatStore, waitForChatHydration } from '../store/chatStore';
 import { useNotificationStore, waitForNotificationHydration } from '../store/notificationStore';
 import { useSessionStore, waitForSessionHydration } from '../store/sessionStore';
 import { waitForTherapistHydration, useTherapistStore } from '../store/therapistStore';
+import { logger } from '../utils/logger';
 
 async function bootstrapAuthSession(): Promise<void> {
+  console.log('[ROOT NAV] auth hydration started');
+
   const token = await restoreSecureAuthToken();
-  const { isAuthenticated } = useAuthStore.getState();
 
   if (!token) {
+    console.log('[ROOT NAV] no secure token found in SecureStore');
+    const { isAuthenticated } = useAuthStore.getState();
     if (isAuthenticated) {
       await useAuthStore.getState().logout();
     }
+    const state = useAuthStore.getState();
+    console.log('[ROOT NAV] auth hydration complete');
+    console.log(`[ROOT NAV] authenticated: ${state.isAuthenticated}`);
+    console.log(`[ROOT NAV] needsOnboarding: ${!state.hasCompletedOnboarding}`);
+    console.log(`[ROOT NAV] selected route: GuestChat`);
     return;
   }
 
-  if (!isAuthenticated) {
-    useAuthStore.setState({ isAuthenticated: true });
-  }
+  // Token restored from SecureStore -> user is authenticated
+  useAuthStore.setState({ isAuthenticated: true, accessToken: token });
 
   try {
     const response = await getAuthService().getMe();
-    if (!response.success) {
-      throw new Error('Session expired');
+    if (response.success && response.data) {
+      useAuthStore.setState({
+        isAuthenticated: true,
+        hasCompletedOnboarding: response.data.onboardingCompleted ?? true,
+        accessToken: token,
+      });
+
+      useProfileStore.setState((state) => ({
+        personalInfo: {
+          ...state.personalInfo,
+          fullName: response.data.name,
+          email: response.data.email,
+          phone: response.data.phone ?? state.personalInfo.phone,
+        },
+        savedPersonalInfo: {
+          ...state.savedPersonalInfo,
+          fullName: response.data.name,
+          email: response.data.email,
+          phone: response.data.phone ?? state.savedPersonalInfo.phone,
+        },
+      }));
     }
-
-    useAuthStore.setState({
-      isAuthenticated: true,
-      hasCompletedOnboarding: response.data.onboardingCompleted,
-      accessToken: token,
-    });
-
-    useProfileStore.setState((state) => ({
-      personalInfo: {
-        ...state.personalInfo,
-        fullName: response.data.name,
-        email: response.data.email,
-        phone: response.data.phone ?? state.personalInfo.phone,
-      },
-      savedPersonalInfo: {
-        ...state.savedPersonalInfo,
-        fullName: response.data.name,
-        email: response.data.email,
-        phone: response.data.phone ?? state.savedPersonalInfo.phone,
-      },
-    }));
-  } catch {
-    await useAuthStore.getState().logout();
+  } catch (err) {
+    logger.warn('[bootstrapAuthSession] getMe failed, preserving restored session:', err);
   }
+
+  const finalState = useAuthStore.getState();
+  console.log('[ROOT NAV] auth hydration complete');
+  console.log(`[ROOT NAV] authenticated: ${finalState.isAuthenticated}`);
+  console.log(`[ROOT NAV] needsOnboarding: ${!finalState.hasCompletedOnboarding}`);
+  const selectedRoute = !finalState.isAuthenticated
+    ? 'GuestChat'
+    : !finalState.hasCompletedOnboarding
+      ? 'Onboarding'
+      : 'MainTabs';
+  console.log(`[ROOT NAV] selected route: ${selectedRoute}`);
 }
 
 export async function initializeApp(): Promise<void> {

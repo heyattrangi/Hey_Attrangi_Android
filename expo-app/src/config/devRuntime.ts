@@ -41,9 +41,9 @@ export function getEffectiveAppEnv(): AppEnvironment {
 
 const ENV_URLS: Record<AppEnvironment, string> = {
   mock: 'mock://local',
-  development: 'https://dev-api.heyattrangi.app',
-  staging: 'https://staging-api.heyattrangi.app',
-  production: 'https://api.heyattrangi.app',
+  development: process.env?.EXPO_PUBLIC_API_BASE_URL ?? 'https://dev-api.heyattrangi.app',
+  staging: process.env?.EXPO_PUBLIC_API_BASE_URL ?? 'https://staging-api.heyattrangi.app',
+  production: process.env?.EXPO_PUBLIC_API_BASE_URL ?? 'https://api.heyattrangi.app',
 };
 
 export function getEffectiveApiBaseUrl(): string {

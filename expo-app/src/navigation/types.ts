@@ -1,9 +1,13 @@
 import { NavigatorScreenParams } from '@react-navigation/native';
 
 export type AuthStackParamList = {
+  GuestChat: undefined;
   Splash: undefined;
+  AuthWelcome: undefined;
   Welcome: undefined;
   SignIn: undefined;
+  EmailOtpSignIn: undefined;
+  EmailOtpVerify: { email: string };
   SignUpBasic: undefined;
   OTPVerify: undefined;
   SetPassword: undefined;
@@ -12,6 +16,7 @@ export type AuthStackParamList = {
 };
 
 export type OnboardingStackParamList = {
+  PatientOnboarding: undefined;
   PersonalWelcome: undefined;
   MoodCheck: undefined;
   ReasonTags: undefined;
@@ -21,6 +26,8 @@ export type OnboardingStackParamList = {
 
 export type MainTabParamList = {
   HomeTab: undefined;
+  ExploreTab: undefined;
+  JourneyTab: undefined;
   ChatTab: undefined;
   MoodTab: undefined;
   TherapistsTab: undefined;
@@ -30,6 +37,10 @@ export type MainTabParamList = {
 
 export type MainStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
+  Profile: undefined;
+  ProfileTab: undefined;
+  Chat: undefined;
+  ChatTab: undefined;
   TherapistProfile: { therapistId: string; name: string };
   Booking: { therapistId: string; name: string };
   Payment: {
@@ -126,6 +137,9 @@ export type MainStackParamList = {
   JournalEntry: { entryId?: string; templateId?: string };
   JournalTemplates: undefined;
   WellnessHub: undefined;
+  AssessmentList: undefined;
+  AssessmentRunner: { assessmentKey: string };
+  AssessmentResult: { result: any };
   BreathingExercise: { exerciseId?: 'box' | '478' | 'calming' };
   Affirmations: undefined;
   WellnessProgress: undefined;

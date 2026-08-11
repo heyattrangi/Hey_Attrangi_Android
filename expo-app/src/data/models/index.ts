@@ -7,6 +7,7 @@ export type {
   AuthUser,
   LoginCredentials,
   SignUpPayload,
+  OtpSendResult,
   PersonalInfo,
   ProfileBundle,
   Therapist,

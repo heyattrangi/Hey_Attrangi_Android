@@ -15,7 +15,7 @@ import { mockAuthService } from './MockAuthService';
 
 /**
  * Real auth service — uses AuthRepository + SessionManager.
- * OTP endpoints still use mock until backend OTP is live.
+ * OTP, forgotPassword, and completeOnboarding endpoints still use mock until backend support is live.
  */
 export class RealAuthService implements IAuthService {
   async login(credentials: LoginCredentials): Promise<ApiResponse<AuthSession>> {
@@ -45,9 +45,13 @@ export class RealAuthService implements IAuthService {
   }
 
   async signUp(payload: SignUpPayload): Promise<ApiResponse<AuthSession>> {
-    // Prefer mock until /auth/signup is registered
     try {
-      return await mockAuthService.signUp(payload);
+      const session = await authRepository.signUp(payload);
+      await sessionManager.establish(
+        session.accessToken,
+        session.refreshToken ?? `refresh_${session.userId}`,
+      );
+      return successResponse(session);
     } catch (error) {
       return failureResponse(normalizeServiceError(error));
     }
@@ -84,6 +88,24 @@ export class RealAuthService implements IAuthService {
     return mockAuthService.resendOtp(phone, countryCode);
   }
 
+  async sendEmailOtp(email: string): Promise<ApiResponse<OtpSendResult>> {
+    try {
+      const result = await authRepository.sendEmailOtp(email);
+      return successResponse(result);
+    } catch (error) {
+      return failureResponse(normalizeServiceError(error));
+    }
+  }
+
+  async verifyEmailOtp(email: string, otp: string): Promise<ApiResponse<AuthSession>> {
+    try {
+      const session = await authRepository.verifyEmailOtp(email, otp);
+      return successResponse(session);
+    } catch (error) {
+      return failureResponse(normalizeServiceError(error));
+    }
+  }
+
   async getMe(): Promise<ApiResponse<AuthUser>> {
     try {
       const user = await authRepository.getMe();
@@ -93,8 +115,13 @@ export class RealAuthService implements IAuthService {
     }
   }
 
-  async completeOnboarding(): Promise<ApiResponse<AuthUser>> {
-    return mockAuthService.completeOnboarding();
+  async completeOnboarding(payload?: any): Promise<ApiResponse<any>> {
+    try {
+      const result = await authRepository.completeOnboarding(payload);
+      return successResponse(result);
+    } catch (error) {
+      return failureResponse(normalizeServiceError(error));
+    }
   }
 }
 

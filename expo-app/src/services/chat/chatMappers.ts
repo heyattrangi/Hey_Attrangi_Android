@@ -149,7 +149,7 @@ export function chatErrorMessage(error: unknown): string {
     return 'Too many messages in a short time. Please wait a moment and try again.';
   }
   if (normalized.includes('502') || normalized.includes('upstream') || normalized.includes('unavailable')) {
-    return 'Pragya AI is temporarily unavailable. Please try again shortly.';
+    return 'Hey Attrangi is temporarily unavailable. Please try again shortly.';
   }
   if (normalized.includes('invalid payload') || normalized.includes('empty')) {
     return 'Please enter a message before sending.';

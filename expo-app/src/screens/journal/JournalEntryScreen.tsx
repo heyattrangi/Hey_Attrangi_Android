@@ -15,6 +15,7 @@ import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { SecondaryButton } from '../../components/ui/SecondaryButton';
 import { PillButton } from '../../components/ui/PillButton';
 import { useJournalStore } from '../../store/journalStore';
+import { journalRepository } from '../../repositories/JournalRepository';
 import { useMoodStore } from '../../store/moodStore';
 import { MainStackParamList } from '../../navigation/types';
 import {
@@ -141,7 +142,17 @@ export const JournalEntryScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   };
 
-  const persist = (asDraft: boolean) => {
+  const persist = async (asDraft: boolean) => {
+    try {
+      await journalRepository.save({
+        title: title.trim() || (asDraft ? 'Untitled draft' : 'Untitled'),
+        content: body,
+        tags,
+      });
+    } catch {
+      // Fallback
+    }
+
     const saved = saveEntry({
       id: entryId.current,
       title: title.trim() || (asDraft ? 'Untitled draft' : 'Untitled'),
