@@ -6,6 +6,9 @@
 export const Colors = {
   // Brand
   brandPrimary: '#E8722A',
+  brandCoral: '#FF7D5C',
+  brandNavy: '#0E3D60',
+  skyBlue: '#8ECCE7',
   brandOrange500: '#f97316',
   brandAmber500: '#f59e0b',
   brandLight: '#FFF3E8',

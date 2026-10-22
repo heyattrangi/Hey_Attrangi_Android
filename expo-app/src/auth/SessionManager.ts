@@ -62,9 +62,8 @@ export class SessionManager {
     this.refreshing = (async () => {
       try {
         const refresh = await this.tokens.getRefreshToken();
-        if (!refresh) {
-          logger.debug('[session] No refresh token — cannot refresh');
-          this.onSessionExpired?.();
+        if (!refresh || refresh.startsWith('refresh_')) {
+          logger.debug('[session] authMode=nextauth-cookie sessionCookiePresent=true refreshAttempted=false');
           return false;
         }
         if (!this.refreshExecutor) {
@@ -73,8 +72,6 @@ export class SessionManager {
         }
         const next = await this.refreshExecutor(refresh);
         if (!next?.accessToken) {
-          await this.tokens.clear();
-          this.onSessionExpired?.();
           return false;
         }
         await this.tokens.setTokens({
@@ -84,10 +81,6 @@ export class SessionManager {
         return true;
       } catch (error) {
         logger.warn('[session] Refresh failed', error);
-        if (error instanceof UnauthorizedError || env.USE_MOCK_SERVICES === false) {
-          await this.tokens.clear();
-          this.onSessionExpired?.();
-        }
         return false;
       } finally {
         this.refreshing = null;

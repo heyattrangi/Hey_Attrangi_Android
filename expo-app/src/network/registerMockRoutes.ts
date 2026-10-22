@@ -76,6 +76,26 @@ export function registerMockRoutes(adapter: MockHttpAdapter): MockHttpAdapter {
     };
   });
 
+  adapter.on('POST', '/api/auth/refresh', async (config) => {
+    const body = (config.body ?? {}) as { refreshToken?: string };
+    if (!body.refreshToken) throw new UnauthorizedError('Missing refresh token');
+    return {
+      accessToken: `refreshed_${body.refreshToken.slice(0, 8)}_${Date.now()}`,
+      refreshToken: body.refreshToken,
+      expiresIn: 86400,
+    };
+  });
+
+  adapter.on('POST', '/auth/refresh', async (config) => {
+    const body = (config.body ?? {}) as { refreshToken?: string };
+    if (!body.refreshToken) throw new UnauthorizedError('Missing refresh token');
+    return {
+      accessToken: `refreshed_${body.refreshToken.slice(0, 8)}_${Date.now()}`,
+      refreshToken: body.refreshToken,
+      expiresIn: 86400,
+    };
+  });
+
   adapter.on('POST', '/api/mobile/auth/logout', async () => {
     await mockAuthService.logout();
     return { ok: true };
@@ -167,6 +187,24 @@ export function registerMockRoutes(adapter: MockHttpAdapter): MockHttpAdapter {
     return res.data;
   });
 
+  adapter.on('GET', '/api/profile/patient', async () => {
+    const res = await mockProfileService.getProfile();
+    if (!res.success) throw res.error;
+    const info = res.data.personalInfo;
+    return {
+      id: 'mock_patient_user_id',
+      name: info.fullName || 'Mock Patient',
+      email: info.email || 'mockpatient@example.com',
+      role: 'PATIENT',
+      plan: 'FREE',
+      createdAt: new Date().toISOString(),
+      patient: {
+        id: 'mock_patient_id',
+        rollNumber: '1001',
+      },
+    };
+  });
+
   adapter.on('PATCH', '/profile', async (config) => {
     const res = await mockProfileService.updateProfile(config.body as never);
     if (!res.success) throw res.error;
@@ -211,6 +249,60 @@ export function registerMockRoutes(adapter: MockHttpAdapter): MockHttpAdapter {
 
   adapter.on('GET', '/journal/entries', async () => ({ items: [] }));
   adapter.on('GET', '/wellness/modules', async () => ({ items: [] }));
+
+  adapter.on('GET', '/api/auth/check-onboarding', async () => ({
+    completed: false,
+    role: 'PATIENT',
+  }));
+
+  adapter.on('POST', '/api/onboarding/patient', async () => ({
+    success: true,
+  }));
+
+  adapter.on('POST', '/api/payments/subscribe', async (config) => {
+    const body = (config.body ?? {}) as { plan?: string; amount?: number };
+    return {
+      success: true,
+      orderId: `order_mock_${Date.now()}`,
+      amount: (body.amount ?? 149) * 100,
+      currency: 'INR',
+    };
+  });
+
+  adapter.on('POST', '/api/payments/subscribe/verify', async () => ({
+    success: true,
+  }));
+
+  adapter.on('POST', '/api/speech/transcribe', async (config) => {
+    console.log('[STT][MOCK_ROUTE] handling POST /api/speech/transcribe');
+    const realBackendUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.0.2.2:3000';
+    try {
+      const isFormData =
+        config.body != null &&
+        typeof (config.body as { append?: unknown }).append === 'function';
+      const reqHeaders: Record<string, string> = { ...config.headers };
+      delete reqHeaders['x-mock-params'];
+      if (isFormData) {
+        delete reqHeaders['Content-Type'];
+        delete reqHeaders['content-type'];
+      }
+
+      const res = await fetch(`${realBackendUrl.replace(/\/$/, '')}/api/speech/transcribe`, {
+        method: 'POST',
+        headers: reqHeaders,
+        body: isFormData ? (config.body as FormData) : JSON.stringify(config.body),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        return data;
+      }
+    } catch (err) {
+      console.warn('[STT][MOCK_ROUTE] backend forward notice:', err);
+    }
+
+    return { transcript: 'Hello, I am feeling anxious today.' };
+  });
 
   return adapter;
 }

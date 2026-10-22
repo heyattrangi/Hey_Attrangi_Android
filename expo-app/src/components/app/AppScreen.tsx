@@ -73,8 +73,8 @@ export const AppScreen = memo<AppScreenProps>(({
       {keyboardAware ? (
         <KeyboardAvoidingView
           style={styles.flex}
-          behavior="padding"
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 24}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
         >
           {body}
         </KeyboardAvoidingView>

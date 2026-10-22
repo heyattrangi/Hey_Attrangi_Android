@@ -54,7 +54,7 @@ export class MockAuthService implements IAuthService {
     );
   }
 
-  async loginWithGoogle(_idToken: string) {
+  async loginWithGoogle(_idToken: string, _email?: string) {
     currentUser = {
       ...currentUser,
       name: 'Google User',
@@ -66,6 +66,24 @@ export class MockAuthService implements IAuthService {
         accessToken: 'mock-google-access-token',
         refreshToken: 'mock-refresh-token',
         userId: 'google-user-1',
+        isReturningUser: true,
+      } satisfies AuthSession),
+      600,
+    );
+  }
+
+  async loginWithApple(_payload: any) {
+    currentUser = {
+      ...currentUser,
+      name: 'Apple User',
+      email: 'apple.user@heyattrangi.com',
+      onboardingCompleted: true,
+    };
+    return mockDelay(
+      successResponse({
+        accessToken: 'mock-apple-access-token',
+        refreshToken: 'mock-refresh-token',
+        userId: 'apple-user-1',
         isReturningUser: true,
       } satisfies AuthSession),
       600,
@@ -122,7 +140,7 @@ export class MockAuthService implements IAuthService {
     return mockDelay(successResponse(mockOtpSendResult()), 400);
   }
 
-  async sendEmailOtp(email: string) {
+  async sendEmailOtp(email: string, _isResend = false) {
     currentUser = {
       ...currentUser,
       email,

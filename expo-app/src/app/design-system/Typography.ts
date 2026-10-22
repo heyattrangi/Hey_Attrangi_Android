@@ -1,15 +1,17 @@
 import { TextStyle } from 'react-native';
 
 /**
- * Hey Attrangi — Production Typography
- * Plus Jakarta Sans — premium sans matching onboarding / product screens.
+ * Hey Attrangi — Production Global Nunito Typography
  */
 
 export const FontFamily = {
-  regular: 'PlusJakartaSans_400Regular',
-  medium: 'PlusJakartaSans_500Medium',
-  semiBold: 'PlusJakartaSans_600SemiBold',
-  bold: 'PlusJakartaSans_700Bold',
+  light: 'Nunito_300Light',
+  regular: 'Nunito_400Regular',
+  medium: 'Nunito_500Medium',
+  semiBold: 'Nunito_600SemiBold',
+  bold: 'Nunito_700Bold',
+  extraBold: 'Nunito_800ExtraBold',
+  black: 'Nunito_900Black',
 } as const;
 
 export const FontSize = {

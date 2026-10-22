@@ -43,7 +43,7 @@ export const AppBootstrap: React.FC<AppBootstrapProps> = ({ children }) => {
     setI18nLocale(usePreferencesStore.getState().languageCode);
 
     SessionManagerFacade.wireSessionExpired(() => {
-      void useAuthStore.getState().logout();
+      logger.info('[Session] Session expired handler triggered');
     });
 
     // Offline queue → repositories (no-op safe when offline path unused)

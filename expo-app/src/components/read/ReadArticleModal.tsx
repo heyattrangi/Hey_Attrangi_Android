@@ -1,0 +1,226 @@
+import React, { useEffect, useCallback } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  BackHandler,
+  Platform,
+} from 'react-native';
+import { Icon } from '../app/Icon';
+import { ReadDeckCardItem } from './ReadDeckCard';
+
+interface ReadArticleModalProps {
+  article: ReadDeckCardItem | null;
+  visible: boolean;
+  onClose: () => void;
+}
+
+function formatReadTimeLabel(readTime: string): string {
+  const t = readTime.trim();
+  if (!t || t === '—') return '—';
+  if (/read/i.test(t)) return t;
+  return `${t} read`;
+}
+
+export const ReadArticleModal: React.FC<ReadArticleModalProps> = ({
+  article,
+  visible,
+  onClose,
+}) => {
+  const handleBackPress = useCallback(() => {
+    onClose();
+    return true;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (visible) {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+      return () => subscription.remove();
+    }
+  }, [visible, handleBackPress]);
+
+  if (!article || !visible) return null;
+
+  // Split body into structured paragraphs
+  const paragraphs = article.content
+    ? article.content.split(/\n\n+/).map((p) => p.trim()).filter(Boolean)
+    : [];
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalRoot}>
+        {/* Reader Top Navigation Bar */}
+        <View style={styles.topBar}>
+          <TouchableOpacity style={styles.backBtn} onPress={onClose} activeOpacity={0.8}>
+            <Icon name="arrow-left" size={18} color="#4A4A4A" />
+            <Text style={styles.backText}>Back to Read</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {/* Article Header Block with Comfortable Top Space */}
+          <View style={styles.headerBlock}>
+            {/* Serif Editorial Article Title */}
+            <Text style={styles.articleTitle}>{article.title}</Text>
+
+            {/* Article Subtitle */}
+            {Boolean(article.subtitle) && (
+              <Text style={styles.articleSubtitle}>{article.subtitle}</Text>
+            )}
+
+            {/* Metadata Row: Category + Vector Book Icon + Read Time */}
+            <View style={styles.metadataRow}>
+              {Boolean(article.category) && (
+                <View style={styles.categoryPill}>
+                  <Text style={styles.categoryPillText}>{article.category}</Text>
+                </View>
+              )}
+              <View style={styles.readTimePill}>
+                <Icon name="book-open" size={13} color="#6B6B6B" />
+                <Text style={styles.readTimePillText}>
+                  {formatReadTimeLabel(article.readTime)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Editorial Divider Line */}
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Structured Paragraph Body */}
+          <View style={styles.bodyContainer}>
+            {paragraphs.map((para, idx) => (
+              <Text key={idx} style={styles.paragraphText}>
+                {para}
+              </Text>
+            ))}
+          </View>
+
+          {/* End Marker Dot */}
+          <View style={styles.endMarkerContainer}>
+            <View style={styles.endMarkerDot} />
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+};
+
+const styles = StyleSheet.create({
+  modalRoot: {
+    flex: 1,
+    backgroundColor: '#F9F8F3', // Cream canvas matching Web Source_Serif_4 editorial background
+  },
+  topBar: {
+    paddingHorizontal: 20,
+    paddingTop: 56,
+    paddingBottom: 12,
+    backgroundColor: '#F9F8F3',
+  },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  backText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#4A4A4A',
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 24, // Increased top spacing (30-50dp breathing space)
+    paddingBottom: 50,
+  },
+  headerBlock: {
+    marginBottom: 8,
+  },
+  articleTitle: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 30,
+    fontWeight: '700',
+    color: '#111111',
+    lineHeight: 37,
+    letterSpacing: -0.4,
+    marginBottom: 12,
+  },
+  articleSubtitle: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#6B6B6B',
+    lineHeight: 24,
+    marginBottom: 16,
+  },
+  metadataRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
+  },
+  categoryPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D8D4CC',
+    backgroundColor: 'transparent',
+  },
+  categoryPillText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B6B6B',
+  },
+  readTimePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D8D4CC',
+    backgroundColor: 'transparent',
+  },
+  readTimePillText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B6B6B',
+  },
+  dividerLine: {
+    height: 1,
+    backgroundColor: '#E4E0D8',
+    marginBottom: 24,
+  },
+  bodyContainer: {
+    gap: 20,
+    marginBottom: 40,
+  },
+  paragraphText: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#333333',
+    lineHeight: 28, // Web leading-[1.8] line height
+  },
+  endMarkerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 20,
+  },
+  endMarkerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#C8C4BC',
+  },
+});

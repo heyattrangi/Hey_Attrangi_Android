@@ -1,7 +1,10 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
 import { MainStackParamList } from './types';
 import { MainTabNavigator } from './MainTabNavigator';
+import { pendingDestinationManager } from '../utils/pendingDestination';
+import { navigateFromActionUrl } from '../utils/actionRouter';
 import { TherapistProfileScreen } from '../screens/therapists/TherapistProfileScreen';
 import { BookingScreen } from '../screens/sessions/BookingScreen';
 import { PaymentScreen } from '../screens/sessions/PaymentScreen';
@@ -14,6 +17,7 @@ import { VideoSessionScreen } from '../screens/sessions/VideoSessionScreen';
 import { SessionCompleteScreen } from '../screens/sessions/SessionCompleteScreen';
 import { SessionFeedbackScreen } from '../screens/sessions/SessionFeedbackScreen';
 import { SettingsScreen } from '../screens/profile/SettingsScreen';
+import { SettingsPlaceholderScreen } from '../screens/profile/SettingsPlaceholderScreen';
 import { PersonalInformationScreen } from '../screens/profile/PersonalInformationScreen';
 import { EmailSecurityScreen } from '../screens/profile/EmailSecurityScreen';
 import { DevicesScreen } from '../screens/profile/DevicesScreen';
@@ -46,7 +50,12 @@ import {
 } from '../screens/ai-conversation';
 import { AppearanceScreen } from '../screens/profile/AppearanceScreen';
 import { LanguageScreen } from '../screens/profile/LanguageScreen';
+import { HelpSupportScreen } from '../screens/profile/HelpSupportScreen';
+import { FaqScreen } from '../screens/profile/FaqScreen';
+import { AboutAatrangiScreen } from '../screens/profile/AboutAatrangiScreen';
+import { ReportProblemScreen } from '../screens/profile/ReportProblemScreen';
 import { PrivacySecurityScreen } from '../screens/profile/PrivacySecurityScreen';
+import { LegalDocumentViewerScreen } from '../screens/profile/LegalDocumentViewerScreen';
 import { PermissionsScreen } from '../screens/profile/PermissionsScreen';
 import { TrustedContactsScreen } from '../screens/profile/TrustedContactsScreen';
 import { EmergencyContactsScreen } from '../screens/profile/EmergencyContactsScreen';
@@ -106,12 +115,18 @@ import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { ChatScreen } from '../screens/chat/ChatScreen';
 import { BiometricLoginScreen } from '../screens/profile/BiometricLoginScreen';
 import { HelpCenterScreen } from '../screens/profile/HelpCenterScreen';
+import { FounderMessageScreen } from '../screens/profile/FounderMessageScreen';
+import { WriteToSandeshScreen } from '../screens/profile/WriteToSandeshScreen';
 import { HelpArticleScreen } from '../screens/profile/HelpArticleScreen';
 import { AccountManagementScreen } from '../screens/profile/AccountManagementScreen';
 import { MoodHistoryScreen } from '../screens/mood/MoodHistoryScreen';
 import { MoodAnalyticsScreen } from '../screens/mood/MoodAnalyticsScreen';
 import { MoodCalendarScreen } from '../screens/mood/MoodCalendarScreen';
 import { MoodDetailScreen } from '../screens/mood/MoodDetailScreen';
+import { ReferralScreen } from '../screens/referral/ReferralScreen';
+import { ReferralRewardScreen } from '../screens/referral/ReferralRewardScreen';
+import { ClaimTShirtScreen } from '../screens/referral/ClaimTShirtScreen';
+import { ReferralSuccessScreen } from '../screens/referral/ReferralSuccessScreen';
 import { JournalHomeScreen } from '../screens/journal/JournalHomeScreen';
 import { JournalEntryScreen } from '../screens/journal/JournalEntryScreen';
 import { JournalTemplatesScreen } from '../screens/journal/JournalTemplatesScreen';
@@ -119,7 +134,15 @@ import { WellnessHubScreen } from '../screens/wellness/WellnessHubScreen';
 import { AssessmentListScreen } from '../screens/assessments/AssessmentListScreen';
 import { AssessmentRunnerScreen } from '../screens/assessments/AssessmentRunnerScreen';
 import { AssessmentResultScreen } from '../screens/assessments/AssessmentResultScreen';
+import { DynamicAssessmentScreen } from '../screens/assessments/DynamicAssessmentScreen';
 import { BreathingExerciseScreen } from '../screens/wellness/BreathingExerciseScreen';
+import { GroundingScreen } from '../screens/activities/Grounding/GroundingScreen';
+import { MicroMomentsScreen } from '../screens/activities/MicroMoments/MicroMomentsScreen';
+import { PMRScreen } from '../screens/activities/ProgressiveMuscleRelaxation/PMRScreen';
+import { JournalReflectionScreen } from '../screens/activities/Journal/JournalReflectionScreen';
+import { ListenTrackPlayerScreen } from '../screens/wellness/ListenTrackPlayerScreen';
+import { ReadArticleDetailScreen } from '../screens/wellness/ReadArticleDetailScreen';
+import { ListenCategoryDetailScreen } from '../screens/wellness/ListenCategoryDetailScreen';
 import { AffirmationsScreen } from '../screens/wellness/AffirmationsScreen';
 import { WellnessProgressScreen } from '../screens/wellness/WellnessProgressScreen';
 import { UiStatesDemoScreen } from '../screens/dev/UiStatesDemoScreen';
@@ -162,9 +185,19 @@ import {
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
 export const MainAppNavigator = () => {
+  const navigation = useNavigation();
+
   React.useEffect(() => {
     console.log('[ROOT NAV] MainAppNavigator mounted');
-  }, []);
+    const pendingUrl = pendingDestinationManager.getPendingDestination();
+    if (pendingUrl) {
+      console.log('[PENDING DESTINATION] Restoring target destination:', pendingUrl);
+      pendingDestinationManager.clearPendingDestination();
+      requestAnimationFrame(() => {
+        navigateFromActionUrl(pendingUrl, navigation);
+      });
+    }
+  }, [navigation]);
 
   return (
     <Stack.Navigator
@@ -195,6 +228,7 @@ export const MainAppNavigator = () => {
     <Stack.Screen name="SessionComplete" component={SessionCompleteScreen} />
     <Stack.Screen name="SessionFeedback" component={SessionFeedbackScreen} />
     <Stack.Screen name="Settings" component={SettingsScreen} />
+    <Stack.Screen name="SettingsPlaceholder" component={SettingsPlaceholderScreen} />
     <Stack.Screen name="AppSearch" component={AppSearchScreen} />
     <Stack.Screen name="SearchHistory" component={SearchHistoryScreen} />
     <Stack.Screen name="PersonalInformation" component={PersonalInformationScreen} />
@@ -228,7 +262,12 @@ export const MainAppNavigator = () => {
     <Stack.Screen name="VoiceConversation" component={VoiceConversationScreen} />
     <Stack.Screen name="Appearance" component={AppearanceScreen} />
     <Stack.Screen name="Language" component={LanguageScreen} />
+    <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+    <Stack.Screen name="Faq" component={FaqScreen} />
+    <Stack.Screen name="AboutAatrangi" component={AboutAatrangiScreen} />
+    <Stack.Screen name="ReportProblem" component={ReportProblemScreen} />
     <Stack.Screen name="PrivacySecurity" component={PrivacySecurityScreen} />
+    <Stack.Screen name="LegalDocumentViewer" component={LegalDocumentViewerScreen} />
     <Stack.Screen name="Permissions" component={PermissionsScreen} />
     <Stack.Screen name="TrustedContacts" component={TrustedContactsScreen} />
     <Stack.Screen name="EmergencyContacts" component={EmergencyContactsScreen} />
@@ -283,11 +322,25 @@ export const MainAppNavigator = () => {
     />
     <Stack.Screen name="BiometricLogin" component={BiometricLoginScreen} />
     <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+    <Stack.Screen name="FounderMessage" component={FounderMessageScreen} />
+    <Stack.Screen name="WriteToSandesh" component={WriteToSandeshScreen} />
+    <Stack.Screen name="Referral" component={ReferralScreen} />
+    <Stack.Screen name="ReferralReward" component={ReferralRewardScreen} />
+    <Stack.Screen name="ClaimTShirt" component={ClaimTShirtScreen} />
+    <Stack.Screen name="ReferralSuccess" component={ReferralSuccessScreen} />
     <Stack.Screen name="HelpArticle" component={HelpArticleScreen} />
     <Stack.Screen name="Profile" component={ProfileScreen} />
     <Stack.Screen name="ProfileTab" component={ProfileScreen} />
-    <Stack.Screen name="Chat" component={ChatScreen} />
-    <Stack.Screen name="ChatTab" component={ChatScreen} />
+    <Stack.Screen
+      name="Chat"
+      component={ChatScreen}
+      options={{ animation: 'fade', animationDuration: 250 }}
+    />
+    <Stack.Screen
+      name="ChatTab"
+      component={ChatScreen}
+      options={{ animation: 'fade', animationDuration: 250 }}
+    />
     <Stack.Screen name="AccountManagement" component={AccountManagementScreen} />
     <Stack.Screen name="MoodHistory" component={MoodHistoryScreen} />
     <Stack.Screen name="MoodAnalytics" component={MoodAnalyticsScreen} />
@@ -302,12 +355,48 @@ export const MainAppNavigator = () => {
     <Stack.Screen name="JournalTemplates" component={JournalTemplatesScreen} />
     <Stack.Screen name="WellnessHub" component={WellnessHubScreen} />
     <Stack.Screen name="AssessmentList" component={AssessmentListScreen} />
+    <Stack.Screen name="DynamicAssessment" component={DynamicAssessmentScreen} />
     <Stack.Screen name="AssessmentRunner" component={AssessmentRunnerScreen} />
     <Stack.Screen name="AssessmentResult" component={AssessmentResultScreen} />
     <Stack.Screen
       name="BreathingExercise"
       component={BreathingExerciseScreen}
-      options={{ presentation: 'modal', animation: 'fade' }}
+      options={{ presentation: 'card', animation: 'slide_from_right' }}
+    />
+    <Stack.Screen
+      name="GroundingExercise"
+      component={GroundingScreen}
+      options={{ presentation: 'card', animation: 'slide_from_right' }}
+    />
+    <Stack.Screen
+      name="MicroMomentsExercise"
+      component={MicroMomentsScreen}
+      options={{ presentation: 'card', animation: 'slide_from_right' }}
+    />
+    <Stack.Screen
+      name="PMRExercise"
+      component={PMRScreen}
+      options={{ presentation: 'card', animation: 'slide_from_right' }}
+    />
+    <Stack.Screen
+      name="JournalReflectionExercise"
+      component={JournalReflectionScreen}
+      options={{ presentation: 'card', animation: 'slide_from_right' }}
+    />
+    <Stack.Screen
+      name="ReadArticleDetail"
+      component={ReadArticleDetailScreen}
+      options={{ presentation: 'card', animation: 'slide_from_right' }}
+    />
+    <Stack.Screen
+      name="ListenCategoryDetail"
+      component={ListenCategoryDetailScreen}
+      options={{ presentation: 'card', animation: 'slide_from_right' }}
+    />
+    <Stack.Screen
+      name="ListenTrackPlayer"
+      component={ListenTrackPlayerScreen}
+      options={{ presentation: 'card', animation: 'slide_from_right' }}
     />
     <Stack.Screen name="Affirmations" component={AffirmationsScreen} />
     <Stack.Screen name="WellnessProgress" component={WellnessProgressScreen} />

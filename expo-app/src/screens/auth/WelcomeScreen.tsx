@@ -47,7 +47,7 @@ export const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.container}>
         <Animated.View entering={FadeInDown.duration(Motion.duration.normal)}>
           <ScreenHeader
-            title="Welcome to Aatrangi!"
+            title="Welcome to Hey Attrangi!"
             subtitle="Your companion for mental wellness"
             centered
           />

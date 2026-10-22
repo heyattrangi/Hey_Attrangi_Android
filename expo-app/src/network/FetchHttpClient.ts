@@ -3,6 +3,7 @@ import { memoryCache } from '../cache';
 import {
   NetworkError,
   NetworkTimeoutError,
+  RateLimitError,
   toAppError,
 } from '../types/errors';
 import {
@@ -82,17 +83,32 @@ export class FetchHttpClient implements HttpClient {
 
     try {
       const url = buildUrl(this.baseUrl, prepared.path, prepared.query);
+      if (prepared.path.includes('/auth') || prepared.path.includes('/onboarding')) {
+        console.log(`[COOKIE-TRANSPORT] endpoint=${prepared.path} credentialsInclude=true`);
+      }
+      const isFormData =
+        prepared.body != null &&
+        ((typeof FormData !== 'undefined' && prepared.body instanceof FormData) ||
+          typeof (prepared.body as { append?: unknown }).append === 'function' ||
+          Object.prototype.toString.call(prepared.body) === '[object FormData]');
+      const requestHeaders: Record<string, string> = {
+        Accept: 'application/json',
+        ...prepared.headers,
+      };
+      if (!isFormData && !requestHeaders['Content-Type']) {
+        requestHeaders['Content-Type'] = 'application/json';
+      }
+
       const response = await fetch(url, {
         method: prepared.method,
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          ...prepared.headers,
-        },
-        body:
-          prepared.body === undefined
-            ? undefined
-            : JSON.stringify(prepared.body),
+        credentials: 'include',
+        redirect: prepared.redirect ?? 'follow',
+        headers: requestHeaders,
+        body: isFormData
+          ? (prepared.body as FormData)
+          : prepared.body === undefined
+          ? undefined
+          : JSON.stringify(prepared.body),
         signal: prepared.signal ?? controller.signal,
       });
 
@@ -106,15 +122,49 @@ export class FetchHttpClient implements HttpClient {
         }
       }
 
-      if (!response.ok) {
+      const isAccepted =
+        response.ok || (prepared.acceptStatuses?.includes(response.status) ?? false);
+      if (!isAccepted) {
         const message =
-          typeof data === 'object' &&
-          data &&
-          'message' in data &&
-          typeof (data as { message: unknown }).message === 'string'
-            ? (data as { message: string }).message
+          typeof data === 'object' && data
+            ? (data as any).message || (data as any).error || (data as any).detail || (data as any).code || (data as any).msg
+            : typeof data === 'string'
+            ? data
             : undefined;
-        throw httpStatusToError(response.status, message);
+
+        const resetInSeconds =
+          typeof data === 'object' && data && typeof (data as any).resetInSeconds === 'number'
+            ? (data as any).resetInSeconds
+            : undefined;
+
+        const requiresLogin =
+          typeof data === 'object' && data ? Boolean((data as any).requiresLogin) : false;
+
+        const lowerMsg = typeof message === 'string' ? message.toLowerCase() : '';
+        const isLimitError =
+          response.status === 427 ||
+          response.status === 429 ||
+          requiresLogin ||
+          lowerMsg.includes('limit') ||
+          lowerMsg.includes('quota') ||
+          lowerMsg.includes('exceeded') ||
+          lowerMsg.includes('too many') ||
+          lowerMsg.includes('requireslogin');
+
+        if (isLimitError) {
+          throw new RateLimitError(
+            typeof message === 'string' && message.length > 0
+              ? message
+              : 'Usage limit reached. Upgrade to Premium for higher limits.',
+            resetInSeconds,
+          );
+        }
+
+        throw httpStatusToError(
+          response.status,
+          typeof message === 'string' ? message : undefined,
+          resetInSeconds,
+        );
       }
 
       const headers: Record<string, string> = {};

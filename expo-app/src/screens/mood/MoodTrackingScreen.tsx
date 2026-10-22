@@ -7,15 +7,19 @@ import {
   TextInput,
   ActivityIndicator,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import Svg, { Rect, Path } from 'react-native-svg';
 import { Icon, AppIcons } from '../../components/app/Icon';
 import { moodRepository, MoodAnalyticsData } from '../../repositories/MoodRepository';
 import { useMoodStore } from '../../store/moodStore';
+import { useProfileStore } from '../../store/profileStore';
+import { useBillingStore } from '../../store/billingStore';
 import { MainStackParamList, MainTabParamList } from '../../navigation/types';
+import { PremiumLimitModal } from '../../components/premium/PremiumLimitModal';
+import { RateLimitError } from '../../types/errors';
 import {
   Screen,
   Text,
@@ -29,7 +33,10 @@ import {
   Radii,
   Shadows,
 } from '../../design-system';
+import { CLOUDINARY_MOOD_ASSETS } from '../../data/cloudinaryMoodAssets';
 import { hapticError, hapticLight, hapticSuccess } from '../../utils/haptics';
+
+import { useSttRecorder } from '../../hooks/useSttRecorder';
 
 type MoodNav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'MoodTab'>,
@@ -41,85 +48,111 @@ interface MoodConfig {
   background: string;
   primary: string;
   muted: string;
-  face: {
-    eyeLeft: { x: number; y: number; width: number; height: number; rx: number };
-    eyeRight: { x: number; y: number; width: number; height: number; rx: number };
-    mouthD: string;
-  };
 }
 
 const MOOD_CONFIG: Record<number, MoodConfig> = {
   0: {
-    label: 'SAD',
-    background: '#F3E8FF',
-    primary: '#4D179A',
+    label: 'Low',
+    background: '#a684ff',
+    primary: '#4d179a',
     muted: 'rgba(77, 23, 154, 0.3)',
-    face: {
-      eyeLeft: { x: 50, y: 43, width: 50, height: 18, rx: 9 },
-      eyeRight: { x: 140, y: 43, width: 50, height: 18, rx: 9 },
-      mouthD: 'M 85,120 Q 120,88 155,120',
-    },
   },
   1: {
-    label: 'BAD',
-    background: '#E0F2FE',
-    primary: '#024A70',
+    label: 'Meh',
+    background: '#0069a8',
+    primary: '#024a70',
     muted: 'rgba(2, 74, 112, 0.3)',
-    face: {
-      eyeLeft: { x: 51, y: 31, width: 48, height: 48, rx: 24 },
-      eyeRight: { x: 141, y: 31, width: 48, height: 48, rx: 24 },
-      mouthD: 'M 85,120 Q 120,88 155,120',
-    },
   },
   2: {
-    label: 'NOT BAD',
-    background: '#FFF3E8',
+    label: 'Okay',
+    background: '#F4A462',
     primary: '#733E0A',
     muted: 'rgba(115, 62, 10, 0.3)',
-    face: {
-      eyeLeft: { x: 50, y: 43, width: 50, height: 18, rx: 9 },
-      eyeRight: { x: 140, y: 43, width: 50, height: 18, rx: 9 },
-      mouthD: 'M 85,110 L 155,110',
-    },
   },
   3: {
-    label: 'GOOD',
-    background: '#ECFDF5',
+    label: 'Good',
+    background: '#AADB1E',
     primary: '#132D0E',
     muted: 'rgba(19, 45, 14, 0.3)',
-    face: {
-      eyeLeft: { x: 51, y: 31, width: 48, height: 48, rx: 24 },
-      eyeRight: { x: 141, y: 31, width: 48, height: 48, rx: 24 },
-      mouthD: 'M 85,95 Q 120,130 155,95',
-    },
   },
   4: {
-    label: 'HAPPY',
-    background: '#FEF9C3',
-    primary: '#733E0A',
+    label: 'Great',
+    background: '#ffd966',
+    primary: '#733e0a',
     muted: 'rgba(115, 62, 10, 0.3)',
-    face: {
-      eyeLeft: { x: 50, y: 43, width: 50, height: 18, rx: 9 },
-      eyeRight: { x: 140, y: 43, width: 50, height: 18, rx: 9 },
-      mouthD: 'M 80,95 Q 120,135 160,95',
-    },
   },
 };
 
-const MOOD_NAMES = ['Sad', 'Bad', 'Not bad', 'Good', 'Happy'];
+const MOOD_NAMES = ['Low', 'Meh', 'Okay', 'Good', 'Great'];
 
 export const MoodTrackingScreen: React.FC = () => {
   const navigation = useNavigation<MoodNav>();
   const addLog = useMoodStore((s) => s.addLog);
+  const userPlan = useProfileStore((s) => s.userPlan);
+  const activePlanId = useBillingStore((s) => s.activePlanId);
+  const isPremiumUser =
+    activePlanId === 'premium' || (userPlan && userPlan.toUpperCase() === 'PREMIUM');
+
+  const maxVoiceLimitSec = isPremiumUser ? 180 : 120;
 
   const [score, setScore] = useState<number>(2);
   const [note, setNote] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState<string>('All');
+  const [premiumModalVisible, setPremiumModalVisible] = useState(false);
+  const [premiumModalCardType, setPremiumModalCardType] = useState<'ASSESSMENT' | 'VOICE'>('ASSESSMENT');
+  const [voiceUsedSeconds, setVoiceUsedSeconds] = useState(0); // Cumulative per note
 
   const [analytics, setAnalytics] = useState<MoodAnalyticsData | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const remainingVoiceSec = Math.max(0, maxVoiceLimitSec - voiceUsedSeconds);
+
+  const {
+    isRecording,
+    isTranscribing,
+    recordTimeSec,
+    startRecording,
+    stopRecording,
+  } = useSttRecorder(
+    (transcriptText) => {
+      if (transcriptText && transcriptText.trim().length > 0) {
+        setNote((prev) => (prev ? `${prev} ${transcriptText.trim()}` : transcriptText.trim()));
+      }
+    },
+    () => {
+      if (!isPremiumUser) {
+        setPremiumModalCardType('VOICE');
+        setPremiumModalVisible(true);
+      }
+    },
+    (elapsedSec) => {
+      setVoiceUsedSeconds((prev) => Math.min(maxVoiceLimitSec, prev + elapsedSec));
+    }
+  );
+
+  const handleMicPress = async () => {
+    if (isRecording) {
+      void hapticLight();
+      await stopRecording();
+      return;
+    }
+    if (isTranscribing) return;
+
+    if (remainingVoiceSec <= 0) {
+      void hapticError();
+      if (!isPremiumUser) {
+        setPremiumModalCardType('VOICE');
+        setPremiumModalVisible(true);
+      }
+      return;
+    }
+    void hapticLight();
+    await startRecording(remainingVoiceSec * 1000);
+  };
+
+  const isSubmitDisabled = isRecording || isTranscribing || saving;
 
   const activeMood = MOOD_CONFIG[score] || MOOD_CONFIG[2];
 
@@ -146,6 +179,7 @@ export const MoodTrackingScreen: React.FC = () => {
   }, [fetchAnalytics]);
 
   const handleSubmit = async () => {
+    if (isSubmitDisabled) return;
     setSaving(true);
     void hapticLight();
     try {
@@ -162,9 +196,22 @@ export const MoodTrackingScreen: React.FC = () => {
       });
       void hapticSuccess();
       setNote('');
+      setVoiceUsedSeconds(0); // FRESH VOICE BUDGET FOR NEXT NOTE!
       void fetchAnalytics();
-    } catch {
+    } catch (err: any) {
       void hapticError();
+      if (
+        err instanceof RateLimitError ||
+        (err?.message &&
+          (err.message.includes('429') ||
+            err.message.includes('LIMIT_EXCEEDED') ||
+            err.message.includes('limit')))
+      ) {
+        if (!isPremiumUser) {
+          setPremiumModalCardType('ASSESSMENT');
+          setPremiumModalVisible(true);
+        }
+      }
     } finally {
       setSaving(false);
     }
@@ -199,63 +246,45 @@ export const MoodTrackingScreen: React.FC = () => {
           />
         }
       >
-        {/* Animated Face Container */}
+        {/* Cloudinary Emoji Face Container */}
         <View style={styles.faceCard}>
-          <Svg viewBox="0 0 240 160" style={styles.svgFace}>
-            <Rect
-              x={activeMood.face.eyeLeft.x}
-              y={activeMood.face.eyeLeft.y}
-              width={activeMood.face.eyeLeft.width}
-              height={activeMood.face.eyeLeft.height}
-              rx={activeMood.face.eyeLeft.rx}
-              fill={activeMood.primary}
-            />
-            <Rect
-              x={activeMood.face.eyeRight.x}
-              y={activeMood.face.eyeRight.y}
-              width={activeMood.face.eyeRight.width}
-              height={activeMood.face.eyeRight.height}
-              rx={activeMood.face.eyeRight.rx}
-              fill={activeMood.primary}
-            />
-            <Path
-              d={activeMood.face.mouthD}
-              fill="none"
-              stroke={activeMood.primary}
-              strokeWidth="12"
-              strokeLinecap="round"
-            />
-          </Svg>
-
-          <Text variant="heading1" style={[styles.moodLabel, { color: activeMood.primary }]}>
-            {activeMood.label}
+          <Image
+            source={{ uri: CLOUDINARY_MOOD_ASSETS[score]?.imageUrl }}
+            style={{ width: 100, height: 100, resizeMode: 'contain' }}
+          />
+          <Text variant="heading1" style={[styles.moodLabel, { color: activeMood.primary, marginTop: 10 }]}>
+            {CLOUDINARY_MOOD_ASSETS[score]?.name}
           </Text>
         </View>
 
         {/* Mood Selector Buttons */}
         <View style={styles.selectorRow}>
-          {MOOD_NAMES.map((name, idx) => {
-            const isSelected = score === idx;
+          {CLOUDINARY_MOOD_ASSETS.map((m) => {
+            const isSelected = score === m.score;
             return (
               <TouchableOpacity
-                key={name}
+                key={m.name}
                 style={[
                   styles.moodBtn,
-                  isSelected && { backgroundColor: activeMood.primary },
+                  isSelected && { backgroundColor: 'rgba(255, 255, 255, 0.3)', borderColor: activeMood.primary, borderWidth: 1.5 },
                 ]}
                 onPress={() => {
                   void hapticLight();
-                  setScore(idx);
+                  setScore(m.score);
                 }}
               >
+                <Image
+                  source={{ uri: m.imageUrl }}
+                  style={{ width: 34, height: 34, resizeMode: 'contain' }}
+                />
                 <Text
                   variant="caption"
                   style={[
                     styles.moodBtnText,
-                    { color: isSelected ? Colors.white : activeMood.primary },
+                    { color: activeMood.primary, marginTop: 4, fontWeight: isSelected ? '700' : '500' },
                   ]}
                 >
-                  {name}
+                  {m.name}
                 </Text>
               </TouchableOpacity>
             );
@@ -271,16 +300,57 @@ export const MoodTrackingScreen: React.FC = () => {
             value={note}
             onChangeText={setNote}
             multiline
+            maxLength={isPremiumUser ? 2000 : 1000}
           />
 
-          <Button
-            variant="primary"
-            label={saving ? 'Saving...' : 'Save Mood Log'}
-            onPress={handleSubmit}
-            loading={saving}
-            disabled={saving}
-            style={{ backgroundColor: activeMood.primary }}
-          />
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 20,
+                backgroundColor: isRecording ? '#FEF2F2' : 'rgba(255,255,255,0.8)',
+                borderWidth: 1,
+                borderColor: isRecording ? '#FCA5A5' : activeMood.muted,
+              }}
+              onPress={() => void handleMicPress()}
+              disabled={isTranscribing}
+              activeOpacity={0.8}
+            >
+              {isTranscribing ? (
+                <ActivityIndicator size="small" color={activeMood.primary} />
+              ) : (
+                <Icon
+                  name={isRecording ? 'stop' : 'microphone'}
+                  size={16}
+                  color={isRecording ? '#DC2626' : remainingVoiceSec <= 0 ? activeMood.muted : activeMood.primary}
+                />
+              )}
+              <Text
+                variant="caption"
+                style={{
+                  fontWeight: '700',
+                  color: isRecording ? '#DC2626' : remainingVoiceSec <= 0 ? activeMood.muted : activeMood.primary,
+                }}
+              >
+                {isRecording ? `${recordTimeSec}s Stop` : isTranscribing ? 'Transcribing...' : 'Voice Note'}
+              </Text>
+            </TouchableOpacity>
+
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Button
+                variant="primary"
+                label={saving ? 'Saving...' : 'Save Mood Log'}
+                onPress={handleSubmit}
+                loading={saving}
+                disabled={isSubmitDisabled}
+                style={{ backgroundColor: activeMood.primary }}
+              />
+            </View>
+          </View>
         </Card>
 
         {/* Analytics Breakdown */}
@@ -350,6 +420,17 @@ export const MoodTrackingScreen: React.FC = () => {
           ) : null}
         </Card>
       </ScrollView>
+
+      {/* Premium Limit Popup */}
+      <PremiumLimitModal
+        visible={premiumModalVisible}
+        cardType={premiumModalCardType}
+        onDismiss={() => setPremiumModalVisible(false)}
+        onUpgrade={() => {
+          setPremiumModalVisible(false);
+          navigation.navigate('Subscription' as any);
+        }}
+      />
     </Screen>
   );
 };

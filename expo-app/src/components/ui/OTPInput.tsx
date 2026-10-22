@@ -124,7 +124,7 @@ export const OTPInput = memo<OTPInputProps>(({
           ]}
           keyboardType="number-pad"
           textContentType={index === 0 ? 'oneTimeCode' : 'none'}
-          autoComplete={index === 0 && Platform.OS === 'android' ? 'sms-otp' : 'off'}
+          autoComplete={index === 0 ? (Platform.OS === 'ios' ? 'one-time-code' : 'sms-otp') : 'off'}
           importantForAutofill={index === 0 ? 'yes' : 'no'}
           maxLength={index === 0 ? length : 1}
           value={code[index]}

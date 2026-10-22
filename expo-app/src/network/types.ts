@@ -13,6 +13,18 @@ export interface HttpRequestConfig {
   skipAuth?: boolean;
   /** Skip refresh-on-401 retry */
   skipRefresh?: boolean;
+  /**
+   * Fetch redirect mode. NextAuth's credentials/signout endpoints respond
+   * with a 302 that carries the Set-Cookie session token — following the
+   * redirect would lose that header, so those calls use 'manual'.
+   */
+  redirect?: 'follow' | 'manual';
+  /**
+   * Status codes to treat as success instead of the default 2xx-only check.
+   * Used for NextAuth's redirect responses (302 on both success and failure -
+   * the caller inspects the response body/headers to tell them apart).
+   */
+  acceptStatuses?: number[];
   timeoutMs?: number;
   /** Cache key override; null disables cache for this call */
   cacheKey?: string | null;

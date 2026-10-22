@@ -7,10 +7,13 @@ export { MaterialCommunityIcons };
 export const AppIcons = {
   home: 'home-outline',
   homeActive: 'home',
+  explore: 'magnify',
+  exploreActive: 'magnify',
+  journey: 'chart-line',
+  journeyActive: 'chart-line',
+  microphone: 'microphone',
   chat: 'message-text-outline',
   chatActive: 'message-text',
-  journey: 'compass-outline',
-  journeyActive: 'compass',
   library: 'book-open-variant',
   libraryActive: 'book-open',
   mood: 'emoticon-outline',
@@ -31,6 +34,7 @@ export const AppIcons = {
   logout: 'logout',
   chevronRight: 'chevron-right',
   empty: 'inbox-outline',
+  pencil: 'pencil-outline',
 } as const;
 
 export type AppIconName = (typeof AppIcons)[keyof typeof AppIcons];
@@ -41,14 +45,24 @@ interface IconProps {
   color?: string;
 }
 
+export function getSafeIconName(name?: string): React.ComponentProps<typeof MaterialCommunityIcons>['name'] {
+  if (!name || typeof name !== 'string' || name.trim() === '' || name === '?') {
+    return 'help-circle-outline';
+  }
+  return name.trim() as any;
+}
+
 export const Icon: React.FC<IconProps> = ({
   name,
   size = 24,
   color = Colors.textPrimary,
-}) => (
-  <MaterialCommunityIcons
-    name={name as React.ComponentProps<typeof MaterialCommunityIcons>['name']}
-    size={size}
-    color={color}
-  />
-);
+}) => {
+  const safeName = getSafeIconName(name);
+  return (
+    <MaterialCommunityIcons
+      name={safeName}
+      size={size}
+      color={color}
+    />
+  );
+};

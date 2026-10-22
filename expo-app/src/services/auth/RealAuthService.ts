@@ -31,9 +31,28 @@ export class RealAuthService implements IAuthService {
     }
   }
 
-  async loginWithGoogle(idToken: string): Promise<ApiResponse<AuthSession>> {
+  async loginWithGoogle(idToken: string, email?: string): Promise<ApiResponse<AuthSession>> {
     try {
-      const session = await authRepository.loginWithGoogle(idToken);
+      const session = await authRepository.loginWithGoogle(idToken, email);
+      await sessionManager.establish(
+        session.accessToken,
+        session.refreshToken ?? `refresh_${session.userId}`,
+      );
+      return successResponse(session);
+    } catch (error) {
+      return failureResponse(normalizeServiceError(error));
+    }
+  }
+
+  async loginWithApple(payload: {
+    identityToken: string;
+    rawNonce: string;
+    user: string;
+    email?: string;
+    fullName?: { givenName?: string | null; familyName?: string | null };
+  }): Promise<ApiResponse<AuthSession>> {
+    try {
+      const session = await authRepository.loginWithApple(payload);
       await sessionManager.establish(
         session.accessToken,
         session.refreshToken ?? `refresh_${session.userId}`,
@@ -88,9 +107,9 @@ export class RealAuthService implements IAuthService {
     return mockAuthService.resendOtp(phone, countryCode);
   }
 
-  async sendEmailOtp(email: string): Promise<ApiResponse<OtpSendResult>> {
+  async sendEmailOtp(email: string, isResend = false): Promise<ApiResponse<OtpSendResult>> {
     try {
-      const result = await authRepository.sendEmailOtp(email);
+      const result = await authRepository.sendEmailOtp(email, isResend);
       return successResponse(result);
     } catch (error) {
       return failureResponse(normalizeServiceError(error));

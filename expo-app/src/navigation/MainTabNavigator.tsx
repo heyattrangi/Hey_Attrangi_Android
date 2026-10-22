@@ -1,34 +1,29 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from './types';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { WellnessHubScreen } from '../screens/wellness/WellnessHubScreen';
-import { JourneyScreen } from '../screens/journey/JourneyScreen';
+import { MyWellbeingScreen } from '../screens/wellbeing/MyWellbeingScreen';
 import { Icon, AppIcons } from '../components/app/Icon';
-import { Colors, Typography, Radii, Spacing } from '../design-system';
+import { FloatingBottomTabBar } from '../components/navigation/FloatingBottomTabBar';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 /**
  * Primary Mobile Navigation Architecture:
- * 1. Home (Personalized Dashboard)
- * 2. Explore (Wellness Hub: Activities | Read | Listen | Assessments)
- * 3. Journey (Personal Wellness Timeline)
+ * Floating translucent glass bottom tab bar with content underlay fade overlay.
  */
 export const MainTabNavigator = () => {
   React.useEffect(() => {
-    console.log('[ROOT NAV] MainTabNavigator mounted');
+    console.log('[ROOT NAV] MainTabNavigator mounted with FloatingBottomTabBar');
   }, []);
 
   return (
     <Tab.Navigator
+      tabBar={(props) => <FloatingBottomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: Colors.brandPrimary,
-        tabBarInactiveTintColor: Colors.textMuted,
-        tabBarLabelStyle: styles.tabLabel,
+        sceneStyle: { backgroundColor: '#FAF8F5' },
         tabBarHideOnKeyboard: true,
       }}
     >
@@ -38,10 +33,10 @@ export const MainTabNavigator = () => {
         options={{
           tabBarLabel: 'Home',
           tabBarAccessibilityLabel: 'Home tab',
-          tabBarIcon: ({ focused, color, size }) => (
+          tabBarIcon: ({ focused, color }) => (
             <Icon
               name={focused ? AppIcons.homeActive : AppIcons.home}
-              size={size}
+              size={20}
               color={color}
             />
           ),
@@ -53,25 +48,25 @@ export const MainTabNavigator = () => {
         options={{
           tabBarLabel: 'Explore',
           tabBarAccessibilityLabel: 'Explore tab',
-          tabBarIcon: ({ focused, color, size }) => (
+          tabBarIcon: ({ focused, color }) => (
             <Icon
-              name={focused ? AppIcons.journeyActive : AppIcons.journey}
-              size={size}
+              name={focused ? AppIcons.exploreActive : AppIcons.explore}
+              size={20}
               color={color}
             />
           ),
         }}
       />
       <Tab.Screen
-        name="JourneyTab"
-        component={JourneyScreen}
+        name="MyWellbeingTab"
+        component={MyWellbeingScreen}
         options={{
-          tabBarLabel: 'Journey',
-          tabBarAccessibilityLabel: 'Journey tab',
-          tabBarIcon: ({ focused, color, size }) => (
+          tabBarLabel: 'My Well-being',
+          tabBarAccessibilityLabel: 'My Well-being tab',
+          tabBarIcon: ({ focused, color }) => (
             <Icon
-              name={focused ? AppIcons.moodActive : AppIcons.mood}
-              size={size}
+              name="leaf"
+              size={20}
               color={color}
             />
           ),
@@ -80,19 +75,3 @@ export const MainTabNavigator = () => {
     </Tab.Navigator>
   );
 };
-
-const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: Colors.surface,
-    borderTopColor: Colors.borderDefault,
-    borderTopWidth: 1,
-    height: 60,
-    paddingBottom: 8,
-    paddingTop: 6,
-  },
-  tabLabel: {
-    fontFamily: Typography.caption.fontFamily,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-});

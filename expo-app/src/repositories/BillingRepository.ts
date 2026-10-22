@@ -7,13 +7,15 @@ export interface CareCreditsResponse {
 
 export interface CreateSubscriptionOrderResponse {
   success: boolean;
-  order: {
+  orderId?: string;
+  order?: {
     id: string;
-    entity: string;
     amount: number;
     currency: string;
   };
-  key: string;
+  amount?: number;
+  currency?: string;
+  key?: string;
 }
 
 export interface VerifySubscriptionRequest {

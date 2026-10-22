@@ -74,5 +74,6 @@ const styles = StyleSheet.create({
   hc: {
     // Slight weight bump aids high-contrast readability without new colors
     fontWeight: '600',
+    fontFamily: 'Nunito_600SemiBold',
   },
 });

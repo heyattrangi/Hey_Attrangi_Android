@@ -4,18 +4,14 @@ import { StatusBar, useColorScheme, View, StyleSheet, ActivityIndicator } from '
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   useFonts,
-  Quicksand_300Light,
-  Quicksand_400Regular,
-  Quicksand_500Medium,
-  Quicksand_600SemiBold,
-  Quicksand_700Bold,
-} from '@expo-google-fonts/quicksand';
-import {
-  PlusJakartaSans_400Regular,
-  PlusJakartaSans_500Medium,
-  PlusJakartaSans_600SemiBold,
-  PlusJakartaSans_700Bold,
-} from '@expo-google-fonts/plus-jakarta-sans';
+  Nunito_300Light,
+  Nunito_400Regular,
+  Nunito_500Medium,
+  Nunito_600SemiBold,
+  Nunito_700Bold,
+  Nunito_800ExtraBold,
+  Nunito_900Black,
+} from '@expo-google-fonts/nunito';
 import { AppBootstrap } from './src/bootstrap/AppBootstrap';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { Toast } from './src/components/ui/Toast';
@@ -35,7 +31,10 @@ import { AppUpdatePrompt } from './src/components/app/AppUpdatePrompt';
 import { Colors } from './src/app/design-system';
 import { logger } from './src/utils/logger';
 import { env } from './src/config/env';
+import { enableGlobalNunitoFont } from './src/utils/fontEnforcer';
 import * as SplashScreen from 'expo-splash-screen';
+
+enableGlobalNunitoFont();
 
 void SplashScreen.preventAutoHideAsync().catch(() => {
   /* Expo Go may already have dismissed native splash */
@@ -44,15 +43,13 @@ void SplashScreen.preventAutoHideAsync().catch(() => {
 export default function App() {
   const isDarkMode = useColorScheme() === 'dark';
   const [fontsLoaded, fontError] = useFonts({
-    Quicksand_300Light,
-    Quicksand_400Regular,
-    Quicksand_500Medium,
-    Quicksand_600SemiBold,
-    Quicksand_700Bold,
-    PlusJakartaSans_400Regular,
-    PlusJakartaSans_500Medium,
-    PlusJakartaSans_600SemiBold,
-    PlusJakartaSans_700Bold,
+    Nunito_300Light,
+    Nunito_400Regular,
+    Nunito_500Medium,
+    Nunito_600SemiBold,
+    Nunito_700Bold,
+    Nunito_800ExtraBold,
+    Nunito_900Black,
   });
   const [minSplashDone, setMinSplashDone] = useState(false);
 

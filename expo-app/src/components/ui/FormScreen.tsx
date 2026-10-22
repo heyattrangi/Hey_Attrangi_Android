@@ -32,7 +32,7 @@ export const FormScreen = memo<FormScreenProps>(({
   >
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior="padding"
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 24}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>

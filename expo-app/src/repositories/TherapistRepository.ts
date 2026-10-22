@@ -5,21 +5,29 @@ import { BaseRepository } from './base/BaseRepository';
 
 export class TherapistRepository extends BaseRepository {
   async list(query?: string): Promise<PagedResponse<Therapist> | Therapist[]> {
-    const { data } = await this.http.get<PagedResponse<Therapist> | Therapist[]>(
-      '/therapists',
-      {
-        query: { q: query },
-        ...this.cacheTtl(CachePolicy.therapistsList),
-      },
-    );
-    return data;
+    try {
+      const { data } = await this.http.get<PagedResponse<Therapist> | Therapist[]>(
+        '/therapists',
+        {
+          query: { q: query },
+          ...this.cacheTtl(CachePolicy.therapistsList),
+        },
+      );
+      return data;
+    } catch {
+      return [];
+    }
   }
 
   async getById(id: string): Promise<Therapist | null> {
-    const { data } = await this.http.get<Therapist | null>(`/therapists/${id}`, {
-      ...this.cacheTtl(CachePolicy.therapistDetail),
-    });
-    return data;
+    try {
+      const { data } = await this.http.get<Therapist | null>(`/therapists/${id}`, {
+        ...this.cacheTtl(CachePolicy.therapistDetail),
+      });
+      return data;
+    } catch {
+      return null;
+    }
   }
 }
 

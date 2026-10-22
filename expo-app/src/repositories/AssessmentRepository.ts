@@ -44,6 +44,14 @@ export class AssessmentRepository extends BaseRepository {
     return data;
   }
 
+  async submitDynamicAssessment(resultsPayload: any): Promise<{ success: boolean; id?: string }> {
+    const { data } = await this.http.post<{ success: boolean; id?: string }>(
+      '/api/patient/assessments',
+      resultsPayload,
+    );
+    return data;
+  }
+
   async getHistory(): Promise<{ attempts: AssessmentAttemptHistory[] }> {
     const { data } = await this.http.get<{ attempts: AssessmentAttemptHistory[] }>(
       '/api/patient/assessments',

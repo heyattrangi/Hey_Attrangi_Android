@@ -57,8 +57,7 @@ export const SessionCompleteScreen: React.FC<Props> = ({
         <AppCard style={styles.placeholder}>
           <Text style={styles.phTitle}>AI Reflection</Text>
           <Text style={styles.phBody}>
-            A gentle summary from Pragya will appear here after the AI API is
-            connected.
+            A gentle summary from your AI companion will appear here after the session.
           </Text>
         </AppCard>
 

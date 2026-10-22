@@ -49,8 +49,13 @@ export const mapAuthResponse = (payload: BackendAuthResponse): AuthSession => {
   const userObj = payload?.user ?? (payload as any) ?? {};
   const userId = userObj.id ?? (userObj as any).sub ?? (payload as any)?.id ?? 'user_' + Date.now();
   const isReturningUser =
-    userObj.onboardingCompleted ??
-    (payload?.needsOnboarding !== undefined ? !payload.needsOnboarding : true);
+    typeof userObj.onboardingCompleted === 'boolean'
+      ? userObj.onboardingCompleted
+      : typeof (payload as any)?.isReturningUser === 'boolean'
+        ? (payload as any).isReturningUser
+        : payload?.needsOnboarding !== undefined
+          ? !payload.needsOnboarding
+          : false;
 
   return {
     accessToken: payload?.accessToken ?? '',
@@ -63,7 +68,7 @@ export const mapAuthResponse = (payload: BackendAuthResponse): AuthSession => {
 export const mapAuthUser = (user: BackendAuthUser): AuthSession => ({
   accessToken: '',
   userId: user?.id ?? '',
-  isReturningUser: user?.onboardingCompleted ?? true,
+  isReturningUser: user?.onboardingCompleted ?? false,
 });
 
 export const mapTherapist = (raw: BackendTherapist): Therapist => {

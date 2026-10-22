@@ -18,7 +18,9 @@ import {
 import { AppError } from '../types/errors';
 import { resolveFetchError } from '../utils/asyncStatus';
 import { useNetworkStore } from './networkStore';
+import { profileRepository, PatientLimitsResponse } from '../repositories/ProfileRepository';
 import { useOnboardingStore } from './onboardingStore';
+import { useBillingStore } from './billingStore';
 
 export type {
   AvatarKey,
@@ -43,10 +45,13 @@ interface ProfileState {
   creditActivity: CreditActivity[];
   selectedPaymentMethod: PaymentMethod;
   creditPurchaseAmount: number;
+  userPlan: string;
+  patientLimits: PatientLimitsResponse | null;
   status: RequestStatus;
   error: AppError | null;
   isHydrated: boolean;
   initialize: () => Promise<void>;
+  fetchPatientLimits: () => Promise<void>;
   updatePersonalInfo: (patch: Partial<PersonalInfo>) => void;
   savePersonalInfo: () => Promise<void>;
   resetPersonalInfoDraft: () => void;
@@ -60,6 +65,7 @@ interface ProfileState {
   setSelectedPaymentMethod: (method: PaymentMethod) => Promise<void>;
   getInvoice: (id: string) => Invoice | undefined;
   syncMockServices: () => void;
+  resetProfileState: () => void;
 }
 
 const defaultPersonalInfo: PersonalInfo = {
@@ -137,11 +143,38 @@ export const useProfileStore = create<ProfileState>()(
       creditActivity: [],
       selectedPaymentMethod: 'upi',
       creditPurchaseAmount: 3600,
+      userPlan: 'FREE',
+      patientLimits: null,
       status: 'idle',
       error: null,
       isHydrated: false,
 
-      /** Keeps non-profile mock services in sync with persisted profile preferences. */
+      resetProfileState: () => {
+        set({
+          personalInfo: { ...defaultPersonalInfo },
+          savedPersonalInfo: { ...defaultPersonalInfo },
+          emailSecurity: { ...defaultEmailSecurity },
+          savedEmailSecurity: { ...defaultEmailSecurity },
+          userPlan: 'FREE',
+          patientLimits: null,
+          careCreditsBalance: 0,
+          creditActivity: [],
+          status: 'idle',
+          error: null,
+        });
+      },
+
+      fetchPatientLimits: async () => {
+        try {
+          const limits = await profileRepository.getPatientLimits();
+          if (limits) {
+            set({ patientLimits: limits });
+          }
+        } catch (err) {
+          console.log('[PROFILE] fetchPatientLimits error:', err);
+        }
+      },
+
       syncMockServices: () => {
         const state = get();
         getNotificationService().hydrate(state.notifications);
@@ -180,13 +213,43 @@ export const useProfileStore = create<ProfileState>()(
                 bundle.personalInfo = refreshed.data.personalInfo;
               }
             } catch {
-              // Trusted contact persistence is best-effort during bootstrap.
+              // Best-effort
             }
           }
 
+          const currentName = (persisted.personalInfo?.fullName || '').trim();
+          const bundleName = (bundle.personalInfo?.fullName || '').trim();
+
+          let resolvedFullName = bundleName;
+          if (!resolvedFullName || resolvedFullName.toLowerCase() === 'patient') {
+            resolvedFullName = currentName && currentName.toLowerCase() !== 'patient' ? currentName : '';
+          }
+
+          const mergedInfo = {
+            ...bundle.personalInfo,
+            fullName: resolvedFullName,
+          };
+
+          let userPlan = (bundle.plan || 'FREE').toUpperCase();
+          try {
+            const me = await profileRepository.getMobileMe();
+            if (me?.plan) {
+              userPlan = me.plan.toUpperCase();
+            }
+          } catch (err) {
+            console.log('[PREMIUM_DEBUG] profileStore me fetch error:', err);
+          }
+
+          console.log(`[PREMIUM_DEBUG] profileStore userPlan synced: ${userPlan}`);
+          useBillingStore.setState({
+            activePlanId: userPlan === 'PREMIUM' ? 'premium' : (userPlan.toLowerCase() as any),
+          });
+          void get().fetchPatientLimits();
+
           set({
-            savedPersonalInfo: { ...bundle.personalInfo },
-            personalInfo: { ...bundle.personalInfo },
+            userPlan,
+            savedPersonalInfo: { ...mergedInfo },
+            personalInfo: { ...mergedInfo },
             savedEmailSecurity: { ...bundle.emailSecurity },
             emailSecurity: { ...bundle.emailSecurity },
             notifications: bundle.notifications,

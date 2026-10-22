@@ -51,7 +51,7 @@ export const ConversationTemplatesScreen: React.FC<Props> = ({ navigation }) => 
                 void hapticSelection();
                 void (async () => {
                   await startFromTemplate(item.id);
-                  navigation.navigate('MainTabs', { screen: 'ChatTab' });
+                  navigation.navigate('Chat');
                   await sendMessage(item.starterPrompt, item.modeId);
                 })();
               }}

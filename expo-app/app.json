@@ -26,8 +26,13 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "com.heyaatrangi.expo",
-      "versionCode": 1,
-      "predictiveBackGestureEnabled": false
+      "versionCode": 6,
+      "softwareKeyboardLayoutMode": "resize",
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -45,9 +50,21 @@
           "backgroundColor": "#FFF8F0"
         }
       ],
-      "@react-native-google-signin/google-signin",
-      "expo-audio",
-      "expo-asset"
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.132642896276-aid9bunf0mm79o5nr0stba1sjesa89vb"
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
+      ],
+      "expo-asset",
+      "expo-sharing"
     ],
     "extra": {
       "eas": {
@@ -60,6 +77,9 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "owner": "aatrangi-private-limited"
+    "owner": "aatrangi-private-limited",
+    "updates": {
+      "url": "https://u.expo.dev/3a67b28b-2a0d-4222-8210-ebd19d11c8b5"
+    }
   }
 }

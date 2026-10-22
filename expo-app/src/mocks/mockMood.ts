@@ -22,11 +22,11 @@ export const mockMoodTags: MoodTagOption[] = [
 ];
 
 export const mockHomeMoods: HomeMoodOption[] = [
-  { id: 'calm', label: 'Calm' },
-  { id: 'happy', label: 'Happy' },
-  { id: 'okay', label: 'Okay' },
-  { id: 'frustrated', label: 'Frustrated' },
   { id: 'sad', label: 'Sad' },
+  { id: 'bad', label: 'Bad' },
+  { id: 'not_bad', label: 'Not bad' },
+  { id: 'good', label: 'Good' },
+  { id: 'happy', label: 'Happy' },
 ];
 
 export const mockMoodHistoryChart: MoodHistoryChartEntry[] = [

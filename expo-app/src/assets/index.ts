@@ -5,24 +5,21 @@
 import { ImageSourcePropType } from 'react-native';
 import { AvatarKey } from '../store/profileStore';
 
+export const CLOUDINARY_BOT_AVATAR_URL =
+  'https://res.cloudinary.com/dxoiluua8/image/upload/v1786803445/BOT_ivqhx6.png';
+
+export const CLOUDINARY_BANNER_BG_URL =
+  'https://res.cloudinary.com/dxoiluua8/image/upload/v1786789037/Banner_bg_rrixld.png';
+
 export const Images = {
-  therapists: {
-    '1': require('../../assets/images/therapist-ananya.png'),
-    '2': require('../../assets/images/therapist-devi.png'),
-    '3': require('../../assets/images/therapist-rahul.png'),
-  },
-  aiCompanion: require('../../assets/images/ai-companion.png'),
+  aiCompanion: { uri: CLOUDINARY_BOT_AVATAR_URL },
+  bannerBg: { uri: CLOUDINARY_BANNER_BG_URL },
 } as const;
 
-export type TherapistImageId = keyof typeof Images.therapists;
-
-export const getTherapistImage = (id: string) =>
-  Images.therapists[id as TherapistImageId];
+export const getTherapistImage = (_id?: string): ImageSourcePropType | undefined => undefined;
 
 export const getAvatarImage = (key: AvatarKey): ImageSourcePropType | undefined => {
   switch (key) {
-    case 'therapist':
-      return Images.therapists['1'];
     case 'ai-companion':
       return Images.aiCompanion;
     default:

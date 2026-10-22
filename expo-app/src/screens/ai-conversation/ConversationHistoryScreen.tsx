@@ -43,7 +43,7 @@ export const ConversationHistoryScreen: React.FC<Props> = ({ navigation }) => {
     async (item: ChatConversation) => {
       void hapticSelection();
       await openConversation(item.id);
-      navigation.navigate('MainTabs', { screen: 'ChatTab' });
+      navigation.navigate('Chat');
     },
     [navigation, openConversation],
   );

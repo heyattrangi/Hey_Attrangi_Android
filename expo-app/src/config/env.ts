@@ -24,6 +24,9 @@ function resolveEnv(): AppEnvironment {
   ) {
     return fromPublic;
   }
+  if (process.env?.EXPO_PUBLIC_USE_MOCK === 'false' || process.env?.EXPO_PUBLIC_API_BASE_URL) {
+    return 'development';
+  }
   if (__DEV__) return 'mock';
   return 'production';
 }
@@ -39,6 +42,7 @@ type EnvShape = {
   ENABLE_REQUEST_LOGGING: boolean;
   ENABLE_DEBUG_LOGS: boolean;
   GOOGLE_CLIENT_ID: string;
+  GOOGLE_IOS_CLIENT_ID: string;
   MIN_SUPPORTED_VERSION: string;
   LATEST_VERSION: string;
   STORE_URL_IOS: string;
@@ -54,68 +58,96 @@ const ENV_CONFIG: Record<AppEnvironment, EnvShape> = {
     AGORA_APP_CERTIFICATE: '',
     ENABLE_REQUEST_LOGGING: true,
     ENABLE_DEBUG_LOGS: true,
-    GOOGLE_CLIENT_ID: process.env?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? process.env?.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '',
+    GOOGLE_CLIENT_ID:
+      process.env?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
+      process.env?.EXPO_PUBLIC_GOOGLE_CLIENT_ID ??
+      '132642896276-qceu7dn7hstcj4ghcl9meg3mlajoolto.apps.googleusercontent.com',
+    GOOGLE_IOS_CLIENT_ID:
+      process.env?.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ??
+      '132642896276-aid9bunf0mm79o5nr0stba1sjesa89vb.apps.googleusercontent.com',
     MIN_SUPPORTED_VERSION: '1.0.0',
     LATEST_VERSION: '1.0.0',
-    STORE_URL_IOS: '',
-    STORE_URL_ANDROID: '',
+    STORE_URL_IOS: 'https://apps.apple.com/app/hey-attrangi/id0000000000',
+    STORE_URL_ANDROID: 'https://play.google.com/store/apps/details?id=com.heyaatrangi.expo',
   },
   development: {
-    API_BASE_URL: process.env?.EXPO_PUBLIC_API_BASE_URL ?? 'https://dev-api.heyattrangi.app', // future
+    API_BASE_URL: process.env?.EXPO_PUBLIC_API_BASE_URL ?? 'https://app-heyattrangi.vercel.app',
     IMAGE_BASE_URL: '',
     SOCKET_URL: '',
     AGORA_APP_ID: '',
     AGORA_APP_CERTIFICATE: '',
     ENABLE_REQUEST_LOGGING: true,
     ENABLE_DEBUG_LOGS: true,
-    GOOGLE_CLIENT_ID: process.env?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? process.env?.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '',
+    GOOGLE_CLIENT_ID:
+      process.env?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
+      process.env?.EXPO_PUBLIC_GOOGLE_CLIENT_ID ??
+      '132642896276-qceu7dn7hstcj4ghcl9meg3mlajoolto.apps.googleusercontent.com',
+    GOOGLE_IOS_CLIENT_ID:
+      process.env?.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ??
+      '132642896276-aid9bunf0mm79o5nr0stba1sjesa89vb.apps.googleusercontent.com',
     MIN_SUPPORTED_VERSION: '1.0.0',
     LATEST_VERSION: '1.0.0',
-    STORE_URL_IOS: '',
-    STORE_URL_ANDROID: '',
+    STORE_URL_IOS: 'https://apps.apple.com/app/hey-attrangi/id0000000000',
+    STORE_URL_ANDROID: 'https://play.google.com/store/apps/details?id=com.heyaatrangi.expo',
   },
   staging: {
-    API_BASE_URL: process.env?.EXPO_PUBLIC_API_BASE_URL ?? 'https://staging-api.heyattrangi.app', // future
+    API_BASE_URL: process.env?.EXPO_PUBLIC_API_BASE_URL ?? 'https://app-heyattrangi.vercel.app',
     IMAGE_BASE_URL: '',
     SOCKET_URL: '',
     AGORA_APP_ID: '',
     AGORA_APP_CERTIFICATE: '',
     ENABLE_REQUEST_LOGGING: true,
     ENABLE_DEBUG_LOGS: false,
-    GOOGLE_CLIENT_ID: process.env?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? process.env?.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '',
+    GOOGLE_CLIENT_ID:
+      process.env?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
+      process.env?.EXPO_PUBLIC_GOOGLE_CLIENT_ID ??
+      '132642896276-qceu7dn7hstcj4ghcl9meg3mlajoolto.apps.googleusercontent.com',
+    GOOGLE_IOS_CLIENT_ID:
+      process.env?.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ??
+      '132642896276-aid9bunf0mm79o5nr0stba1sjesa89vb.apps.googleusercontent.com',
     MIN_SUPPORTED_VERSION: '1.0.0',
     LATEST_VERSION: '1.0.0',
-    STORE_URL_IOS: '',
-    STORE_URL_ANDROID: '',
+    STORE_URL_IOS: 'https://apps.apple.com/app/hey-attrangi/id0000000000',
+    STORE_URL_ANDROID: 'https://play.google.com/store/apps/details?id=com.heyaatrangi.expo',
   },
   production: {
-    API_BASE_URL: process.env?.EXPO_PUBLIC_API_BASE_URL ?? 'https://api.heyattrangi.app', // future
+    API_BASE_URL: process.env?.EXPO_PUBLIC_API_BASE_URL ?? 'https://app-heyattrangi.vercel.app',
     IMAGE_BASE_URL: '',
     SOCKET_URL: '',
     AGORA_APP_ID: '',
     AGORA_APP_CERTIFICATE: '',
     ENABLE_REQUEST_LOGGING: false,
     ENABLE_DEBUG_LOGS: false,
-    GOOGLE_CLIENT_ID: process.env?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? process.env?.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '',
+    GOOGLE_CLIENT_ID:
+      process.env?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
+      process.env?.EXPO_PUBLIC_GOOGLE_CLIENT_ID ??
+      '132642896276-qceu7dn7hstcj4ghcl9meg3mlajoolto.apps.googleusercontent.com',
+    GOOGLE_IOS_CLIENT_ID:
+      process.env?.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ??
+      '132642896276-aid9bunf0mm79o5nr0stba1sjesa89vb.apps.googleusercontent.com',
     MIN_SUPPORTED_VERSION: '1.0.0',
     LATEST_VERSION: '1.0.0',
-    STORE_URL_IOS: '',
-    STORE_URL_ANDROID: '',
+    STORE_URL_IOS: 'https://apps.apple.com/app/hey-attrangi/id0000000000',
+    STORE_URL_ANDROID: 'https://play.google.com/store/apps/details?id=com.heyaatrangi.expo',
   },
 };
 
 const active = ENV_CONFIG[ENV];
 
+const isExplicitMockFalse = process.env?.EXPO_PUBLIC_USE_MOCK === 'false';
+const configuredApiUrl = process.env?.EXPO_PUBLIC_API_BASE_URL;
+const resolvedApiBaseUrl = (isExplicitMockFalse || configuredApiUrl)
+  ? (configuredApiUrl || 'https://app-heyattrangi.vercel.app')
+  : active.API_BASE_URL;
+const isMockMode = !isExplicitMockFalse && resolvedApiBaseUrl.startsWith('mock://');
+
 export const env = {
   current: ENV,
   ...active,
+  API_BASE_URL: resolvedApiBaseUrl,
   API_TIMEOUT_MS: 30000,
-  /**
-   * Data source switches (container reads these).
-   * Stay mock-on by default. Set EXPO_PUBLIC_USE_MOCK=false when real APIs are ready.
-   */
-  USE_MOCK_NON_AUTH_MODULES: process.env?.EXPO_PUBLIC_USE_MOCK !== 'false',
-  USE_MOCK_SERVICES: process.env?.EXPO_PUBLIC_USE_MOCK !== 'false',
+  USE_MOCK_NON_AUTH_MODULES: isMockMode,
+  USE_MOCK_SERVICES: isMockMode,
   DEEP_LINK_SCHEME: 'heyattrangi',
   DEEP_LINK_PREFIXES: ['heyattrangi://', 'https://heyattrangi.app'] as const,
   SUPPORT_EMAIL: 'care@heyattrangi.app',

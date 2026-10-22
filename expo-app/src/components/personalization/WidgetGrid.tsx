@@ -73,7 +73,7 @@ export const WidgetGrid = memo<WidgetGridProps>(({
           subtitle: sessionLabel ? 'Upcoming' : 'Book care',
         };
       case 'ai_reflection':
-        return { value: 'Reflect', subtitle: 'With Pragya' };
+        return { value: 'Reflect', subtitle: 'AI Companion' };
       case 'sleep':
         return { value: '—', subtitle: 'Log soon' };
       case 'water':

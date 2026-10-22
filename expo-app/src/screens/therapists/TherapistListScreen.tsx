@@ -141,7 +141,7 @@ export const TherapistListScreen: React.FC = () => {
     >
       <Text style={styles.title}>Schedule</Text>
       <Text style={styles.subtitle}>
-        Curated for you- verified professionals on Aatrangi
+        Curated for you- verified professionals on Hey Attrangi
       </Text>
 
       <View style={styles.searchRow}>

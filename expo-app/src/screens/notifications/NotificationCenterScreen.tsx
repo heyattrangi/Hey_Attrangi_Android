@@ -120,14 +120,16 @@ export const NotificationCenterScreen: React.FC<Props> = ({ navigation }) => {
           navigation.navigate('Sessions');
           break;
         case 'ChatTab':
+          navigation.navigate('Chat');
+          break;
         case 'MainTabs':
-          navigation.navigate('MainTabs', { screen: 'ChatTab' });
+          navigation.navigate('MainTabs', { screen: 'HomeTab' });
           break;
         case 'MoodTab':
-          navigation.navigate('MainTabs', { screen: 'MoodTab' });
+          navigation.navigate('MoodHistory');
           break;
         case 'TherapistsTab':
-          navigation.navigate('MainTabs', { screen: 'TherapistsTab' });
+          navigation.navigate('Sessions');
           break;
         case 'JournalHome':
           navigation.navigate('JournalHome');

@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   ViewStyle,
 } from 'react-native';
-import { Colors, Typography, Radius, Spacing, Motion } from '../../app/design-system';
+import { Colors, Radius, Spacing, Motion } from '../../app/design-system';
 import { buttonA11y, MIN_TOUCH_TARGET } from '../../utils/accessibility';
 
 export interface SecondaryButtonProps {
@@ -52,12 +52,15 @@ export const SecondaryButton = memo<SecondaryButtonProps>(({
       })}
     >
       {loading ? (
-        <ActivityIndicator color={Colors.primary} />
+        <ActivityIndicator color={Colors.primary} size="small" />
       ) : (
         <View style={styles.content} importantForAccessibility="no-hide-descendants">
           {icon ? <View style={styles.iconContainer}>{icon}</View> : null}
           <Text
             style={[isFull ? styles.fullText : styles.compactText]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
             maxFontSizeMultiplier={1.4}
           >
             {label}
@@ -72,27 +75,27 @@ SecondaryButton.displayName = 'SecondaryButton';
 
 const styles = StyleSheet.create({
   fullButton: {
-    minHeight: 56,
+    minHeight: 52,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.borderDefault,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#0F172A',
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
-    marginVertical: Spacing.sm,
-    paddingVertical: Spacing.sm,
+    paddingVertical: 14,
     paddingHorizontal: Spacing.md,
   },
   compactButton: {
-    borderWidth: 1,
-    borderColor: Colors.borderDefault,
+    borderWidth: 1.5,
+    borderColor: '#0F172A',
     borderRadius: Radius.pill,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
     minHeight: MIN_TOUCH_TARGET,
     justifyContent: 'center',
-    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
   },
   disabled: {
     opacity: 0.5,
@@ -101,17 +104,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
   },
   iconContainer: {
-    marginRight: Spacing.sm,
+    marginRight: 4,
   },
   fullText: {
-    ...Typography.buttonText,
-    color: Colors.textSecondary,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+    textAlign: 'center',
   },
   compactText: {
-    ...Typography.label,
-    color: Colors.textPrimary,
-    fontWeight: '500',
+    fontSize: 13,
+    color: '#0F172A',
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });

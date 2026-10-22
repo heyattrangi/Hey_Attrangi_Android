@@ -48,6 +48,8 @@ export const BillingCheckoutScreen: React.FC<Props> = ({
   const { kind, planId, title, amount } = route.params;
   const selected = useProfileStore((s) => s.selectedPaymentMethod);
   const setSelected = useProfileStore((s) => s.setSelectedPaymentMethod);
+  const personalInfo = useProfileStore((s) => s.personalInfo);
+  const loadProfile = useProfileStore((s) => s.initialize);
   const appliedPromo = useBillingStore((s) => s.appliedPromo);
   const promoSuggestions = useBillingStore((s) => s.promoSuggestions);
   const applyPromo = useBillingStore((s) => s.applyPromo);
@@ -85,53 +87,81 @@ export const BillingCheckoutScreen: React.FC<Props> = ({
     setConfirmOpen(false);
     try {
       if (kind === 'subscription') {
+        // Subscriptions always go through the real backend/Razorpay flow —
+        // there is no mock fallback for money-moving payments. Any failure
+        // here (order creation, checkout, or verification) is a genuine
+        // payment failure, surfaced via the catch block below.
         const orderRes = await billingRepository.createSubscriptionOrder(
           planId || 'essential',
           total,
         );
 
-        if (orderRes?.order?.id && orderRes?.key) {
-          const options = {
-            description: `${title} Subscription`,
-            image: 'https://heyattrangi.app/logo.png',
-            currency: 'INR',
-            key: orderRes.key,
-            amount: orderRes.order.amount,
-            name: 'Hey Attrangi',
-            order_id: orderRes.order.id,
-            prefill: {
-              email: 'patient@heyattrangi.app',
-              contact: '9876543210',
-              name: 'Patient',
-            },
-            theme: { color: Colors.primary },
-          };
-
-          const razorpayData: any = await RazorpayCheckout.open(options);
-
-          const verifyRes = await billingRepository.verifySubscription({
-            razorpay_order_id: razorpayData.razorpay_order_id,
-            razorpay_payment_id: razorpayData.razorpay_payment_id,
-            razorpay_signature: razorpayData.razorpay_signature,
-            plan: planId || 'essential',
-            amount: total,
-          });
-
-          if (verifyRes.success) {
-            await profileRepository.getMobileMe();
-            navigation.replace('PaymentSuccess', {
-              transactionId: verifyRes.transactionId || razorpayData.razorpay_payment_id,
-              receiptId: orderRes.order.id,
-              amountLabel: `₹${total}`,
-              title: 'Subscription updated',
-              kind: 'subscription',
-            });
-            return;
-          }
+        const orderId = orderRes?.orderId || orderRes?.order?.id;
+        if (!orderId) {
+          throw new Error('Could not create subscription order.');
         }
+
+        const orderAmount = orderRes?.amount || orderRes?.order?.amount || total * 100;
+        const razorpayKey = orderRes?.key || process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID;
+
+        const prefillObj: any = {};
+        if (personalInfo?.email) prefillObj.email = personalInfo.email;
+        if (personalInfo?.fullName) prefillObj.name = personalInfo.fullName;
+        if (personalInfo?.phone && personalInfo.phone.trim().length > 0) {
+          prefillObj.contact = personalInfo.phone.trim();
+        }
+
+        const options: any = {
+          description: `${title} Subscription`,
+          currency: 'INR',
+          key: razorpayKey,
+          amount: orderAmount,
+          name: 'Hey Attrangi',
+          order_id: orderId,
+          theme: { color: Colors.primary },
+        };
+
+        if (Object.keys(prefillObj).length > 0) {
+          options.prefill = prefillObj;
+        }
+
+        const keyPrefix = razorpayKey ? razorpayKey.substring(0, 8) : 'unknown';
+        console.log(
+          `[RZP][ORDER_CREATED] orderId=${orderId} amount=${orderAmount} currency=${options.currency} keyPrefix=${keyPrefix}`,
+        );
+
+        const razorpayData: any = await RazorpayCheckout.open(options);
+
+        const verifyRes = await billingRepository.verifySubscription({
+          razorpay_order_id: razorpayData.razorpay_order_id,
+          razorpay_payment_id: razorpayData.razorpay_payment_id,
+          razorpay_signature: razorpayData.razorpay_signature,
+          plan: planId || 'essential',
+          amount: total,
+        });
+
+        if (!verifyRes.success) {
+          throw new Error(verifyRes.message || 'Payment verification failed.');
+        }
+
+        // Backend is authoritative: refresh profile/subscription state from
+        // the server rather than assuming Premium locally.
+        await profileRepository.getMobileMe();
+        await loadProfile();
+        useBillingStore.setState({ activePlanId: 'premium' });
+        await useBillingStore.getState().fetchBillingHome();
+        navigation.replace('PaymentSuccess', {
+          transactionId: verifyRes.transactionId || razorpayData.razorpay_payment_id,
+          receiptId: orderRes?.order?.id || orderId,
+          amountLabel: `₹${total}`,
+          title: 'Subscription updated',
+          kind: 'subscription',
+        });
+        return;
       }
 
-      // Fallback checkout
+      // Non-subscription checkouts (e.g. Care Credits) use the existing
+      // gateway-agnostic checkout flow.
       const result = await checkout({
         kind,
         planId,
@@ -144,13 +174,27 @@ export const BillingCheckoutScreen: React.FC<Props> = ({
         transactionId: result.transactionId,
         receiptId: result.receiptId,
         amountLabel: `₹${total}`,
-        title: kind === 'subscription' ? 'Subscription updated' : 'Credits added',
+        title: 'Credits added',
         kind,
       });
     } catch (err: any) {
+      const errDescription = err?.description || err?.message || '';
+      const errStep = err?.step || err?.error?.step || '';
+      const errReason = err?.reason || err?.error?.reason || '';
+      const errCode = err?.code;
+
+      if (kind === 'subscription') {
+        console.log(
+          `[RZP][CHECKOUT_FAILURE] code=${errCode} description="${errDescription}" step="${errStep}" reason="${errReason}"`,
+        );
+      }
+
       setFailed(true);
       navigation.navigate('PaymentFailure', {
-        message: err?.message || 'Payment cancelled or failed. Please try again.',
+        message:
+          kind === 'subscription'
+            ? "Payment couldn't be completed. Please try again or use another payment method."
+            : err?.message || 'Payment cancelled or failed. Please try again.',
       });
     }
   };

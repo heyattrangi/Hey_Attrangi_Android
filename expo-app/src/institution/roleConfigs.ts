@@ -60,7 +60,7 @@ export const ALL_PLATFORM_ROLES: PlatformRole[] = [
 const studentTabs: MainTabId[] = [
   'HomeTab',
   'ChatTab',
-  'JourneyTab',
+  'MyWellbeingTab',
   'MoodTab',
   'ProfileTab',
 ];
@@ -104,7 +104,7 @@ export const ROLE_DASHBOARD_CONFIGS: RoleDashboardConfig[] = [
     showAdminTools: false,
     quickActions: [
       { id: 'qa1', label: 'Mood check-in', icon: 'emoticon-outline', route: 'MoodTab' },
-      { id: 'qa2', label: 'Talk to Pragya', icon: 'robot-outline', route: 'ChatTab' },
+      { id: 'qa2', label: 'Talk to AI Companion', icon: 'robot-outline', route: 'ChatTab' },
       { id: 'qa3', label: 'Campus resources', icon: 'lifebuoy', route: 'CampusResources' },
       { id: 'qa4', label: 'Programs', icon: 'calendar-star', route: 'CampusPrograms' },
     ],

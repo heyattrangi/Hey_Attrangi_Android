@@ -1,141 +1,330 @@
 import React from 'react';
-import { StyleSheet, Text, View, Switch } from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { AppScreen, AppHeader, AppCard } from '../../components/app';
-import { PreferenceOptionCard } from '../../components/profile';
-import { SegmentedControl } from '../../components/ui/SegmentedControl';
-import { usePreferencesStore } from '../../store/preferencesStore';
 import {
-  AppThemeId,
-  DisplayDensityId,
-  FontSizeId,
-} from '../../types/domain';
+  StyleSheet,
+  View,
+  ScrollView,
+  TouchableOpacity,
+  Text,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Icon } from '../../components/app/Icon';
+import { usePreferencesStore } from '../../store/preferencesStore';
+import { AppThemeId, FontSizeId } from '../../types/domain';
 import { MainStackParamList } from '../../navigation/types';
-import { Colors, Spacing, Typography } from '../../app/design-system';
-import { useUiStore } from '../../store/uiStore';
+import { hapticLight, hapticSelection } from '../../utils/haptics';
 
-type Props = {
-  navigation: NativeStackNavigationProp<MainStackParamList, 'Appearance'>;
-};
+type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
-const THEMES: Array<{ id: AppThemeId; label: string; description: string }> = [
-  { id: 'system', label: 'System', description: 'Match your device setting' },
-  { id: 'light', label: 'Light', description: 'Bright and soft' },
-  { id: 'dark', label: 'Dark', description: 'Coming soon — preference saved' },
-];
+export const AppearanceScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NavigationProp>();
 
-export const AppearanceScreen: React.FC<Props> = ({ navigation }) => {
   const appearance = usePreferencesStore((s) => s.appearance);
   const setAppearance = usePreferencesStore((s) => s.setAppearance);
-  const showToast = useUiStore((s) => s.showToast);
 
-  const onTheme = (id: AppThemeId) => {
-    setAppearance({ theme: id });
-    if (id === 'dark') {
-      showToast('Dark theme is saved and will apply when available');
-    }
+  const selectedTheme = appearance.theme || 'system';
+  const selectedFontSize = appearance.fontSize || 'default';
+  const isHighContrast = Boolean(appearance.highContrast);
+
+  const handleThemeChange = (t: AppThemeId) => {
+    void hapticSelection();
+    setAppearance({ theme: t });
+  };
+
+  const handleFontSizeChange = (fs: FontSizeId) => {
+    void hapticSelection();
+    setAppearance({ fontSize: fs });
+  };
+
+  const handleContrastChange = (hc: boolean) => {
+    void hapticSelection();
+    setAppearance({ highContrast: hc });
   };
 
   return (
-    <AppScreen includeBottomInset gradient="topRightWarm">
-      <AppHeader
-        title="Appearance"
-        subtitle="Look and feel"
-        onBack={() => navigation.goBack()}
-      />
-
-      <Text style={styles.section}>Theme</Text>
-      {THEMES.map((item) => (
-        <PreferenceOptionCard
-          key={item.id}
-          label={item.label}
-          description={item.description}
-          selected={appearance.theme === item.id}
-          onPress={() => onTheme(item.id)}
-        />
-      ))}
-
-      <Text style={[styles.section, styles.spaced]}>Font size</Text>
-      <SegmentedControl
-        options={[
-          { label: 'Small', value: 'small' },
-          { label: 'Default', value: 'default' },
-          { label: 'Large', value: 'large' },
-          { label: 'XL', value: 'extraLarge' },
+    <View style={[styles.screenRoot, { paddingTop: Math.max(insets.top, 16) }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 24) + 32 },
         ]}
-        value={appearance.fontSize}
-        onChange={(v) => setAppearance({ fontSize: v as FontSizeId })}
-        style={styles.control}
-      />
-
-      <Text style={[styles.section, styles.spaced]}>Display density</Text>
-      <SegmentedControl
-        options={[
-          { label: 'Comfortable', value: 'comfortable' },
-          { label: 'Compact', value: 'compact' },
-        ]}
-        value={appearance.density}
-        onChange={(v) => setAppearance({ density: v as DisplayDensityId })}
-        style={styles.control}
-      />
-
-      <Text style={[styles.section, styles.spaced]}>Accessibility</Text>
-      <AppCard style={styles.toggleCard}>
-        <View style={styles.toggleRow}>
-          <View style={styles.copy}>
-            <Text style={styles.label}>Reduce motion</Text>
-            <Text style={styles.desc}>Limit animations and transitions</Text>
-          </View>
-          <Switch
-            value={appearance.reduceMotion}
-            onValueChange={(v) => setAppearance({ reduceMotion: v })}
-            trackColor={{ false: Colors.borderDefault, true: Colors.primaryLight }}
-            thumbColor={appearance.reduceMotion ? Colors.primary : Colors.white}
-            accessibilityLabel="Reduce motion"
-          />
+      >
+        {/* Header Bar */}
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => {
+              void hapticLight();
+              navigation.goBack();
+            }}
+            activeOpacity={0.7}
+          >
+            <Icon name="chevron-left" size={24} color="#0F172A" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Appearance</Text>
         </View>
-      </AppCard>
-      <AppCard style={styles.toggleCard}>
-        <View style={styles.toggleRow}>
-          <View style={styles.copy}>
-            <Text style={styles.label}>High contrast</Text>
-            <Text style={styles.desc}>Stronger text and control contrast</Text>
+
+        {/* MAIN CARD CONTAINER */}
+        <View style={styles.cardContainer}>
+          <Text style={styles.subtitleText}>
+            Personalize your viewing experience instantly.
+          </Text>
+
+          {/* SECTION 1: THEME */}
+          <View style={styles.sectionBlock}>
+            <Text style={styles.sectionHeaderTitle}>THEME</Text>
+            <View style={styles.segmentedBar}>
+              <TouchableOpacity
+                style={[
+                  styles.segmentBtn,
+                  selectedTheme === 'light' && styles.segmentBtnActive,
+                ]}
+                onPress={() => handleThemeChange('light')}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.segmentBtnText,
+                    selectedTheme === 'light' && styles.segmentBtnTextActive,
+                  ]}
+                >
+                  Light
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.segmentBtn,
+                  selectedTheme === 'system' && styles.segmentBtnActive,
+                ]}
+                onPress={() => handleThemeChange('system')}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.segmentBtnText,
+                    selectedTheme === 'system' && styles.segmentBtnTextActive,
+                  ]}
+                >
+                  System default
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.segmentBtn,
+                  selectedTheme === 'dark' && styles.segmentBtnActive,
+                ]}
+                onPress={() => handleThemeChange('dark')}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.segmentBtnText,
+                    selectedTheme === 'dark' && styles.segmentBtnTextActive,
+                  ]}
+                >
+                  Dark
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <Switch
-            value={appearance.highContrast}
-            onValueChange={(v) => setAppearance({ highContrast: v })}
-            trackColor={{ false: Colors.borderDefault, true: Colors.primaryLight }}
-            thumbColor={appearance.highContrast ? Colors.primary : Colors.white}
-            accessibilityLabel="High contrast"
-          />
+
+          {/* SECTION 2: TEXT SIZE */}
+          <View style={styles.sectionBlock}>
+            <Text style={styles.sectionHeaderTitle}>TEXT SIZE</Text>
+            <View style={styles.segmentedBar}>
+              <TouchableOpacity
+                style={[
+                  styles.segmentBtn,
+                  selectedFontSize === 'small' && styles.segmentBtnActive,
+                ]}
+                onPress={() => handleFontSizeChange('small')}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.segmentBtnText,
+                    selectedFontSize === 'small' && styles.segmentBtnTextActive,
+                  ]}
+                >
+                  Small
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.segmentBtn,
+                  selectedFontSize === 'default' && styles.segmentBtnActive,
+                ]}
+                onPress={() => handleFontSizeChange('default')}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.segmentBtnText,
+                    selectedFontSize === 'default' && styles.segmentBtnTextActive,
+                  ]}
+                >
+                  Medium
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.segmentBtn,
+                  selectedFontSize === 'large' && styles.segmentBtnActive,
+                ]}
+                onPress={() => handleFontSizeChange('large')}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.segmentBtnText,
+                    selectedFontSize === 'large' && styles.segmentBtnTextActive,
+                  ]}
+                >
+                  Large
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* SECTION 3: CONTRAST MODE */}
+          <View style={styles.sectionBlock}>
+            <Text style={styles.sectionHeaderTitle}>CONTRAST MODE</Text>
+            <View style={styles.segmentedBar}>
+              <TouchableOpacity
+                style={[
+                  styles.segmentBtn,
+                  !isHighContrast && styles.segmentBtnActive,
+                ]}
+                onPress={() => handleContrastChange(false)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.segmentBtnText,
+                    !isHighContrast && styles.segmentBtnTextActive,
+                  ]}
+                >
+                  Standard
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.segmentBtn,
+                  isHighContrast && styles.segmentBtnActive,
+                ]}
+                onPress={() => handleContrastChange(true)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.segmentBtnText,
+                    isHighContrast && styles.segmentBtnTextActive,
+                  ]}
+                >
+                  High Contrast
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-      </AppCard>
-    </AppScreen>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  section: {
-    ...Typography.caption,
-    color: Colors.textMuted,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: Spacing.sm,
+  screenRoot: {
+    flex: 1,
+    backgroundColor: '#FAF6F0',
   },
-  spaced: { marginTop: Spacing.lg },
-  control: { marginBottom: Spacing.sm },
-  toggleCard: { marginBottom: Spacing.sm },
-  toggleRow: { flexDirection: 'row', alignItems: 'center' },
-  copy: { flex: 1, marginRight: Spacing.md },
-  label: {
-    ...Typography.body,
-    color: Colors.textPrimary,
+  scrollContent: {
+    paddingHorizontal: 20,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+    gap: 12,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  cardContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#EDE6DF',
+  },
+  subtitleText: {
+    fontSize: 16,
     fontWeight: '600',
+    color: '#0F172A',
+    lineHeight: 22,
+    marginBottom: 24,
   },
-  desc: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginTop: 2,
+  sectionBlock: {
+    marginBottom: 24,
+  },
+  sectionHeaderTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 1.5,
+    marginBottom: 10,
+    paddingLeft: 2,
+  },
+  segmentedBar: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    padding: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentBtnActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  segmentBtnTextActive: {
+    color: '#0F172A',
+    fontWeight: '800',
   },
 });

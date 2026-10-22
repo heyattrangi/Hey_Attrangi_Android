@@ -149,7 +149,7 @@ export const AppSearchScreen: React.FC<Props> = ({ navigation }) => {
     suggestions.length > 0;
 
   return (
-    <AppScreen includeBottomInset gradient="topRightWarm">
+    <AppScreen keyboardAware includeBottomInset gradient="topRightWarm">
       <AppHeader
         title="Search"
         subtitle="Discover therapists, journals, moods, sessions & more"

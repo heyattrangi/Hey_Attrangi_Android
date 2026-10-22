@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, ViewStyle, StyleSheet } from 'react-native';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import { Gradients, GradientPreset, LinearGradientDef } from '../tokens/gradients';
@@ -17,7 +17,7 @@ export const GradientView: React.FC<GradientViewProps> = ({
   children,
 }) => {
   const gradient = customGradient || Gradients[preset] || Gradients.primaryCta;
-  const gradientId = `grad_${Math.random().toString(36).substring(2, 9)}`;
+  const gradientId = useMemo(() => `grad_${preset || 'custom'}`, [preset]);
 
   return (
     <View style={[styles.container, style]}>
@@ -50,5 +50,6 @@ const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
     position: 'relative',
+    width: '100%',
   },
 });

@@ -111,7 +111,7 @@ export const TherapistProfileScreen: React.FC<Props> = ({ navigation, route }) =
                 <Text style={styles.specialty}>{therapist.specialty}</Text>
                 <Text style={styles.credentials}>{therapist.credentials}</Text>
                 {therapist.verified ? (
-                  <Badge label="Verified on Aatrangi" variant="primary" appearance="pill" style={styles.badge} />
+                  <Badge label="Verified on Hey Attrangi" variant="primary" appearance="pill" style={styles.badge} />
                 ) : null}
                 {therapist.rating != null ? (
                   <View style={styles.ratingRow}>

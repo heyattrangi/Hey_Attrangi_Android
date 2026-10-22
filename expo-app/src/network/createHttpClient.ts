@@ -29,6 +29,10 @@ function isMockBaseUrl(url: string): boolean {
  * 3. Set `env.USE_MOCK_SERVICES = false` in container
  */
 export function createHttpClient(): HttpClient {
+  console.log(
+    `[ENV_DEBUG] environment=${env.current} apiBaseUrl=${env.API_BASE_URL} mockEnabled=${env.USE_MOCK_SERVICES} productionBackend=https://app-heyattrangi.vercel.app`,
+  );
+
   const interceptors = {
     request: [loggingRequestInterceptor, createAuthInterceptor(tokenManager)],
     response: [loggingResponseInterceptor],
@@ -42,14 +46,13 @@ export function createHttpClient(): HttpClient {
         interceptors,
       });
 
-  // Register refresh executor once (uses raw client without refresh wrapper)
-  sessionManager.setRefreshExecutor(async (refreshToken) => {
-    const res = await base.post<{
-      accessToken: string;
-      refreshToken?: string;
-    }>('/auth/refresh', { refreshToken }, { skipAuth: true, skipRefresh: true });
-    return res.data;
-  });
+  // NextAuth's JWT session strategy has no refresh-token endpoint (verified:
+  // no /api/auth/refresh route exists on the backend) - a session cookie is
+  // valid until it expires, and there is nothing to exchange it for. When
+  // one does expire, the correct behavior is the same as on web: the next
+  // authenticated call gets a 401 and the user has to sign in again. This
+  // executor exists only to satisfy SessionManager's interface.
+  sessionManager.setRefreshExecutor(async () => null);
 
   return withRefreshRetry(base, sessionManager);
 }

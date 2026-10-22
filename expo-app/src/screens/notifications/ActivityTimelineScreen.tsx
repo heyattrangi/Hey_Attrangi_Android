@@ -109,7 +109,7 @@ export const ActivityTimelineScreen: React.FC<Props> = ({ navigation }) => {
                     } else if (item.kind === 'journal') {
                       navigation.navigate('JournalHome');
                     } else if (item.kind === 'ai') {
-                      navigation.navigate('MainTabs', { screen: 'ChatTab' });
+                      navigation.navigate('Chat');
                     } else if (item.kind === 'payment') {
                       navigation.navigate('BillingInvoices');
                     } else if (item.kind === 'wellness') {

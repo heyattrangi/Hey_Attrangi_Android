@@ -4,15 +4,14 @@ import {
   Text as RNText,
   ActivityIndicator,
   StyleSheet,
+  View,
   ViewStyle,
   TextStyle,
 } from 'react-native';
 import { Colors } from '../tokens/colors';
 import { Radii } from '../tokens/radii';
 import { Spacing } from '../tokens/spacing';
-import { Shadows } from '../tokens/shadows';
 import { Typography } from '../tokens/typography';
-import { GradientView } from './GradientView';
 
 export interface ButtonProps {
   label: string;
@@ -38,39 +37,19 @@ export const Button: React.FC<ButtonProps> = ({
   const isPrimary = variant === 'primary';
   const isSecondary = variant === 'secondary';
   const isGhost = variant === 'ghost';
-
-  if (isPrimary && !disabled) {
-    return (
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={onPress}
-        disabled={disabled || loading}
-        style={[styles.primaryContainer, Shadows.primaryCta, style]}
-      >
-        <GradientView preset="primaryCta" style={styles.primaryGradient}>
-          {loading ? (
-            <ActivityIndicator size="small" color={Colors.white} />
-          ) : (
-            <>
-              {icon}
-              <RNText style={[styles.primaryText, labelStyle]}>{label}</RNText>
-            </>
-          )}
-        </GradientView>
-      </TouchableOpacity>
-    );
-  }
+  const isDisabled = disabled || loading;
 
   return (
     <TouchableOpacity
-      activeOpacity={0.8}
+      activeOpacity={0.85}
       onPress={onPress}
-      disabled={disabled || loading}
+      disabled={isDisabled}
       style={[
         styles.base,
+        isPrimary && styles.primary,
         isSecondary && styles.secondary,
         isGhost && styles.ghost,
-        disabled && styles.disabled,
+        isDisabled && (isPrimary ? styles.disabledPrimary : styles.disabledOther),
         style,
       ]}
     >
@@ -80,78 +59,98 @@ export const Button: React.FC<ButtonProps> = ({
           color={isPrimary ? Colors.white : Colors.brandPrimary}
         />
       ) : (
-        <>
-          {icon}
+        <View style={styles.contentRow}>
+          {icon ? <View style={styles.iconWrapper}>{icon}</View> : null}
           <RNText
             style={[
               styles.baseText,
+              isPrimary && styles.primaryText,
               isSecondary && styles.secondaryText,
               isGhost && styles.ghostText,
-              disabled && styles.disabledText,
+              isDisabled && (isPrimary ? styles.disabledPrimaryText : styles.disabledOtherText),
               labelStyle,
             ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
           >
             {label}
           </RNText>
-        </>
+        </View>
       )}
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  primaryContainer: {
-    height: 48,
-    borderRadius: Radii.pill,
-    overflow: 'hidden',
-  },
-  primaryGradient: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.lg,
-    gap: Spacing.xs,
-  },
-  primaryText: {
-    ...Typography.bodyMedium,
-    color: Colors.white,
-    fontWeight: '800',
-    fontSize: 14,
-  },
   base: {
-    height: 48,
+    minHeight: 52,
+    width: '100%',
     borderRadius: Radii.pill,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.lg,
-    gap: Spacing.xs,
+    paddingVertical: 14,
+  },
+  primary: {
+    backgroundColor: '#FF6000',
+    elevation: 2,
+    shadowColor: '#FF6000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
   },
   secondary: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.borderDefault,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#0F172A',
+    elevation: 1,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
   ghost: {
-    backgroundColor: Colors.transparent,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
   },
-  disabled: {
-    backgroundColor: Colors.borderStrong,
-    borderColor: Colors.borderStrong,
+  disabledPrimary: {
+    backgroundColor: '#CBD5E1',
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  disabledOther: {
+    opacity: 0.5,
+  },
+  contentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+  },
+  iconWrapper: {
+    marginRight: 4,
   },
   baseText: {
     ...Typography.bodyMedium,
-    fontWeight: '700',
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  primaryText: {
+    color: Colors.white,
   },
   secondaryText: {
-    color: Colors.textPrimary,
+    color: '#0F172A',
   },
   ghostText: {
     color: Colors.brandPrimary,
   },
-  disabledText: {
+  disabledPrimaryText: {
+    color: '#94A3B8',
+  },
+  disabledOtherText: {
     color: Colors.textMuted,
   },
 });

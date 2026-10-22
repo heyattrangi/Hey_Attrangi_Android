@@ -42,7 +42,7 @@ export const ConversationSearchScreen: React.FC<Props> = ({ navigation }) => {
         onPress={() => {
           void hapticSelection();
           void openConversation(item.conversationId).then(() => {
-            navigation.navigate('MainTabs', { screen: 'ChatTab' });
+            navigation.navigate('Chat');
           });
         }}
         {...buttonA11y(item.title, { hint: item.snippet })}

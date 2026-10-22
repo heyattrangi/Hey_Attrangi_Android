@@ -7,6 +7,27 @@ import { env, AppEnvironment } from './env';
 
 let mockServicesOverride: boolean | null = null;
 let preferredEnvOverride: AppEnvironment | null = null;
+// Defaults to true (bypass disabled) so real auth/onboarding always controls
+// navigation, including in dev builds. The instant-MainTabs shortcut in
+// bootstrapAuthSession() only exists for quick UI iteration on screens deep
+// in the app; flip this via Dev Tools -> Environment when you explicitly
+// want that shortcut. It can never affect release builds (gated on __DEV__,
+// stripped at build time), and must stay `true` here for real E2E validation.
+let forceRealAuthFlowOverride = true;
+
+/**
+ * When true, RootNavigator ignores the __DEV__ MainTabs shortcut and routes
+ * purely off real auth/onboarding state, even in a dev build. Exists so the
+ * production auth/onboarding path can actually be exercised and verified
+ * during development instead of always being masked by the dev bypass.
+ */
+export function getForceRealAuthFlowOverride(): boolean {
+  return forceRealAuthFlowOverride;
+}
+
+export function setForceRealAuthFlowOverride(value: boolean): void {
+  forceRealAuthFlowOverride = value;
+}
 
 export function getMockServicesOverride(): boolean | null {
   return mockServicesOverride;
@@ -32,7 +53,7 @@ export function getEffectiveUseMockServices(): boolean {
 
 export function getEffectiveUseMockNonAuth(): boolean {
   if (mockServicesOverride !== null) return mockServicesOverride;
-  return env.USE_MOCK_SERVICES || env.USE_MOCK_NON_AUTH_MODULES;
+  return env.USE_MOCK_SERVICES;
 }
 
 export function getEffectiveAppEnv(): AppEnvironment {

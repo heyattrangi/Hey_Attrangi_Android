@@ -24,6 +24,7 @@ export const Text: React.FC<TextProps> = ({
   return (
     <RNText
       style={[
+        { fontFamily: 'Nunito_400Regular' },
         variantStyle,
         { color, textAlign: align },
         style,

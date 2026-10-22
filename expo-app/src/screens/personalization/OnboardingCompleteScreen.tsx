@@ -47,7 +47,7 @@ export const OnboardingCompleteScreen: React.FC<Props> = ({ navigation }) => {
           style={styles.footer}
           entering={FadeInUp.delay(160).duration(Motion.duration.normal)}
         >
-          <PrimaryButton label="Welcome to Aatrangi" onPress={handleFinish} />
+          <PrimaryButton label="Welcome to Hey Attrangi" onPress={handleFinish} />
         </Animated.View>
       </View>
     </OnboardingContainer>

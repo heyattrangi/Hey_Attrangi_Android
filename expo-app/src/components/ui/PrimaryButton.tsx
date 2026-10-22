@@ -8,7 +8,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { Colors, Typography, Radius, Spacing, Motion } from '../../app/design-system';
+import { Colors, Radius, Spacing, Motion } from '../../app/design-system';
 import { Icon } from '../app/Icon';
 import { buttonA11y } from '../../utils/accessibility';
 import { hapticMedium } from '../../utils/haptics';
@@ -50,7 +50,7 @@ export const PrimaryButton = memo<PrimaryButtonProps>(({
         styles.button,
         isCompact && styles.buttonCompact,
         isFilled ? styles.filledButton : styles.outlineButton,
-        disabled && (isFilled ? styles.filledDisabled : styles.outlineDisabled),
+        isDisabled && (isFilled ? styles.filledDisabled : styles.outlineDisabled),
         style,
       ]}
       onPress={() => {
@@ -67,7 +67,7 @@ export const PrimaryButton = memo<PrimaryButtonProps>(({
       })}
     >
       {loading ? (
-        <ActivityIndicator color={isFilled ? Colors.white : Colors.primary} />
+        <ActivityIndicator color={isFilled ? Colors.white : Colors.primary} size="small" />
       ) : (
         <View style={styles.contentContainer} importantForAccessibility="no-hide-descendants">
           {icon ? <View style={styles.iconContainer}>{icon}</View> : null}
@@ -76,9 +76,12 @@ export const PrimaryButton = memo<PrimaryButtonProps>(({
               styles.text,
               isCompact && styles.textCompact,
               isFilled ? styles.filledText : styles.outlineText,
-              disabled && isFilled && styles.filledDisabledText,
+              isDisabled && isFilled && styles.filledDisabledText,
               textStyle,
             ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
             maxFontSizeMultiplier={1.4}
           >
             {label}
@@ -98,32 +101,37 @@ PrimaryButton.displayName = 'PrimaryButton';
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 56,
+    minHeight: 52,
     borderRadius: Radius.pill,
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
-    marginVertical: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.lg,
   },
   buttonCompact: {
     minHeight: 40,
     width: 'auto',
-    marginVertical: 0,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
   },
   filledButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: '#FF6000',
+    elevation: 2,
+    shadowColor: '#FF6000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
   },
   outlineButton: {
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.borderDefault,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#0F172A',
   },
   filledDisabled: {
-    backgroundColor: Colors.primaryDisabled,
+    backgroundColor: '#CBD5E1',
+    elevation: 0,
+    shadowOpacity: 0,
   },
   outlineDisabled: {
     opacity: 0.5,
@@ -132,27 +140,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
   },
   iconContainer: {
-    marginRight: Spacing.sm,
+    marginRight: 4,
   },
   arrowIcon: {
-    marginLeft: Spacing.xs,
+    marginLeft: 6,
   },
   text: {
-    ...Typography.buttonText,
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   textCompact: {
-    ...Typography.label,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
   filledText: {
-    color: Colors.textWhite,
+    color: '#FFFFFF',
   },
   outlineText: {
-    color: Colors.textSecondary,
+    color: '#0F172A',
   },
   filledDisabledText: {
-    color: Colors.textWhite,
+    color: '#94A3B8',
   },
 });

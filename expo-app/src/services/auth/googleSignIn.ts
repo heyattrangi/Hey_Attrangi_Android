@@ -1,15 +1,26 @@
+import { Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { env } from '../../config/env';
 import { ValidationError, UnknownError } from '../../types/errors';
 
 let configured = false;
 
+WebBrowser.maybeCompleteAuthSession();
+
 export function configureGoogleSignIn(): void {
   if (configured) return;
   const webClientId = env.GOOGLE_CLIENT_ID;
-  if (webClientId) {
+  const iosClientId = env.GOOGLE_IOS_CLIENT_ID || undefined;
+  const webClientIdPresent = Boolean(webClientId);
+  const iosClientIdPresent = Boolean(iosClientId);
+  console.log(
+    `[AUTH][GOOGLE][CONFIG] googleWebClientIdPresent=${webClientIdPresent} googleIosClientIdPresent=${iosClientIdPresent} platform=${Platform.OS}`
+  );
+  if (webClientId || iosClientId) {
     GoogleSignin.configure({
       webClientId,
+      iosClientId,
       offlineAccess: false,
     });
     configured = true;
@@ -20,30 +31,49 @@ export function isGoogleSignInConfigured(): boolean {
   return configured;
 }
 
-export async function signInWithGoogle(): Promise<string> {
+export interface GoogleSignInResult {
+  idToken: string;
+  email?: string;
+}
+
+export async function signInWithGoogle(): Promise<GoogleSignInResult> {
   if (env.USE_MOCK_SERVICES) {
     configured = true;
     await new Promise((resolve) => setTimeout(resolve, 400));
-    return 'mock-google-id-token';
+    return { idToken: 'mock-google-id-token', email: 'user@example.com' };
   }
 
   configureGoogleSignIn();
 
   try {
-    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    if (Platform.OS === 'android') {
+      console.log('[AUTH][GOOGLE][START] Attempting Google Sign-In via Native Play Services...');
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    } else {
+      console.log('[AUTH][GOOGLE][START] Attempting Google Sign-In via Native iOS SDK...');
+    }
     const response = await GoogleSignin.signIn();
 
     const idToken = response.data?.idToken ?? (response as any)?.idToken;
+    const email = response.data?.user?.email ?? (response as any)?.user?.email;
+
+    console.log(
+      `[AUTH][GOOGLE][RESULT] idTokenPresent=${Boolean(idToken)} emailPresent=${Boolean(email)} platform=${Platform.OS}`
+    );
+
     if (!idToken) {
       throw new ValidationError('Google Sign-In failed to retrieve ID token.');
     }
-    return idToken;
+    return { idToken, email };
   } catch (error: any) {
+    console.log(
+      `[AUTH][GOOGLE][ERROR] code=${error?.code ?? 'unknown'} message=${error?.message ?? String(error)} platform=${Platform.OS}`
+    );
     if (error?.code === statusCodes.SIGN_IN_CANCELLED) {
       throw new ValidationError('Google Sign-In was cancelled.');
     } else if (error?.code === statusCodes.IN_PROGRESS) {
       throw new ValidationError('Google Sign-In is already in progress.');
-    } else if (error?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+    } else if (Platform.OS === 'android' && error?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
       throw new ValidationError('Google Play Services are not available or updated.');
     } else if (error instanceof ValidationError) {
       throw error;

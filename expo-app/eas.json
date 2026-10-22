@@ -19,6 +19,21 @@
         "buildType": "apk"
       }
     },
+    "development-device": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "development",
+        "EXPO_PUBLIC_USE_MOCK": "true",
+        "EXPO_PUBLIC_RELEASE_CHANNEL": "development"
+      },
+      "ios": {
+        "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "channel": "preview",
@@ -40,13 +55,21 @@
         "EXPO_PUBLIC_RELEASE_CHANNEL": "beta"
       }
     },
+    "tester": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "channel": "production",
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_APP_ENV": "production",
         "EXPO_PUBLIC_USE_MOCK": "false",
-        "EXPO_PUBLIC_RELEASE_CHANNEL": "production"
+        "EXPO_PUBLIC_RELEASE_CHANNEL": "production",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "132642896276-qceu7dn7hstcj4ghcl9meg3mlajoolto.apps.googleusercontent.com"
       }
     }
   },

@@ -1,409 +1,649 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
+  ScrollView,
   TouchableOpacity,
-  Alert,
-  Image,
   Text,
+  TextInput,
+  Modal,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useFocusEffect } from '@react-navigation/native';
-import { AppHeader } from '../../components/app';
-import { AppInput } from '../../components/app';
-import { PrimaryButton } from '../../components/common/PrimaryButton';
-import { SecondaryButton } from '../../components/ui/SecondaryButton';
-import { FormScreen } from '../../components/ui/FormScreen';
-import { DiscardChangesDialog } from '../../components/ui/dialogs';
 import { Icon } from '../../components/app/Icon';
-import { useOnboardingStore } from '../../store/onboardingStore';
-import { useProfileStore, AvatarKey } from '../../store/profileStore';
-import { useUiStore } from '../../store/uiStore';
-import { ageFromDateOfBirth } from '../../services/profile/profileMappers';
+import { useProfileStore } from '../../store/profileStore';
+import { useAuthStore } from '../../store/authStore';
+import { ProfileRepository } from '../../repositories/ProfileRepository';
+import { getHttpClient } from '../../network';
 import { MainStackParamList } from '../../navigation/types';
-import { Colors, Spacing, Typography } from '../../app/design-system';
-import { Icons } from '../../theme/icons';
-import { getAvatarImage } from '../../assets';
-import {
-  isRequired,
-  isValidEmail,
-  isValidPhone,
-  isValidDateOfBirth,
-} from '../../utils/validation';
-import { buttonA11y } from '../../utils/accessibility';
+import { hapticLight, hapticSelection, hapticSuccess } from '../../utils/haptics';
 
-type Props = {
-  navigation: NativeStackNavigationProp<MainStackParamList, 'PersonalInformation'>;
-};
+type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
-export const PersonalInformationScreen: React.FC<Props> = ({ navigation }) => {
-  const onboardingName = useOnboardingStore((s) => s.name);
-  const onboardingPhone = useOnboardingStore((s) => s.phone);
+function getInitials(name?: string): string {
+  if (!name || typeof name !== 'string' || !name.trim()) return 'U';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return parts[0][0].toUpperCase();
+}
+
+const MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+const YEARS = Array.from({ length: 87 }, (_, i) => 2026 - i);
+const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
+
+export const PersonalInformationScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NavigationProp>();
+
   const personalInfo = useProfileStore((s) => s.personalInfo);
-  const savedPersonalInfo = useProfileStore((s) => s.savedPersonalInfo);
   const updatePersonalInfo = useProfileStore((s) => s.updatePersonalInfo);
-  const savePersonalInfo = useProfileStore((s) => s.savePersonalInfo);
-  const profileStatus = useProfileStore((s) => s.status);
-  const resetPersonalInfoDraft = useProfileStore((s) => s.resetPersonalInfoDraft);
-  const showToast = useUiStore((s) => s.showToast);
+  const loadProfile = useProfileStore((s) => s.initialize);
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [initialized, setInitialized] = useState(false);
-  const [discardVisible, setDiscardVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Field Edit Modal States
+  const [activeModal, setActiveModal] = useState<'name' | 'dob' | 'phone' | 'gender' | null>(null);
+
+  // Edit Form Fields
+  const [nameVal, setNameVal] = useState('');
+  const [dobVal, setDobVal] = useState('');
+  const [phoneVal, setPhoneVal] = useState('');
+  const [genderVal, setGenderVal] = useState('');
+
+  // DOB Picker States
+  const [selectedDobYear, setSelectedDobYear] = useState(1995);
+  const [selectedDobMonth, setSelectedDobMonth] = useState(1);
+  const [selectedDobDay, setSelectedDobDay] = useState(1);
+
+  const profileRepo = useMemo(() => new ProfileRepository(getHttpClient()), []);
 
   useEffect(() => {
-    if (!initialized && !savedPersonalInfo.fullName && onboardingName) {
-      updatePersonalInfo({
-        fullName: onboardingName,
-        phone: onboardingPhone.replace(/\D/g, '').slice(-10),
-      });
-      setInitialized(true);
-    }
-  }, [initialized, onboardingName, onboardingPhone, savedPersonalInfo.fullName, updatePersonalInfo]);
+    const fetchLatest = async () => {
+      setLoading(true);
+      try {
+        await loadProfile();
+      } catch (err) {
+        console.log('[PERSONAL_INFO] Load profile error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    void fetchLatest();
+  }, [loadProfile]);
 
-  const isDirty =
-    JSON.stringify(personalInfo) !== JSON.stringify(savedPersonalInfo);
+  useEffect(() => {
+    setNameVal(personalInfo.fullName || '');
+    setDobVal(personalInfo.dateOfBirth || '');
+    setPhoneVal(personalInfo.phone || '');
+    setGenderVal(personalInfo.gender || '');
+  }, [personalInfo]);
 
-  const handleBack = useCallback(() => {
-    if (isDirty) {
-      setDiscardVisible(true);
-      return true;
-    }
-    return false;
-  }, [isDirty]);
+  const initials = useMemo(() => getInitials(personalInfo.fullName), [personalInfo.fullName]);
 
-  useFocusEffect(
-    useCallback(() => {
-      const unsub = navigation.addListener('beforeRemove', (e) => {
-        if (!isDirty) return;
-        e.preventDefault();
-        handleBack();
-      });
-      return unsub;
-    }, [navigation, isDirty, handleBack]),
-  );
-
-  const validate = (): boolean => {
-    const next: Record<string, string> = {};
-    if (!isRequired(personalInfo.fullName)) next.fullName = 'Full name is required';
-    if (personalInfo.username && personalInfo.username.trim().length < 3) {
-      next.username = 'Username must be at least 3 characters';
-    }
-    if (!isValidPhone(personalInfo.phone)) next.phone = 'Enter a valid 10-digit phone number';
-    if (personalInfo.email && !isValidEmail(personalInfo.email)) {
-      next.email = 'Enter a valid email address';
-    }
-    if (personalInfo.dateOfBirth && !isValidDateOfBirth(personalInfo.dateOfBirth)) {
-      next.dateOfBirth = 'Use format YYYY-MM-DD';
-    }
-    if (personalInfo.emergencyContact && !isValidPhone(personalInfo.emergencyContact)) {
-      next.emergencyContact = 'Enter a valid emergency contact number';
-    }
-    if (
-      personalInfo.trustedContactPhone &&
-      !isValidPhone(personalInfo.trustedContactPhone)
-    ) {
-      next.trustedContactPhone = 'Enter a valid phone number';
-    }
-    setErrors(next);
-    return Object.keys(next).length === 0;
+  const openModal = (field: 'name' | 'dob' | 'phone' | 'gender') => {
+    void hapticSelection();
+    setNameVal(personalInfo.fullName || '');
+    setDobVal(personalInfo.dateOfBirth || '');
+    setPhoneVal(personalInfo.phone || '');
+    setGenderVal(personalInfo.gender || '');
+    setActiveModal(field);
   };
 
-  const handleSave = async () => {
-    if (!validate()) {
-      showToast('Please fix the errors below', 'error');
-      return;
-    }
-    const derivedAge = ageFromDateOfBirth(personalInfo.dateOfBirth);
-    if (derivedAge) {
-      updatePersonalInfo({ age: String(derivedAge) });
-    }
+  const handleSaveField = async () => {
+    if (saving) return;
+    void hapticLight();
+    setSaving(true);
+
+    const payload: { name?: string; dob?: string; phone?: string; gender?: string } = {};
+
+    if (activeModal === 'name') payload.name = nameVal.trim();
+    if (activeModal === 'dob') payload.dob = dobVal.trim();
+    if (activeModal === 'phone') payload.phone = phoneVal.trim();
+    if (activeModal === 'gender') payload.gender = genderVal.trim();
+
     try {
-      await savePersonalInfo();
-      showToast('Personal information saved successfully');
-      navigation.goBack();
-    } catch {
-      const message =
-        useProfileStore.getState().error?.message ??
-        'Failed to save personal information';
-      showToast(message, 'error');
+      const success = await profileRepo.updateProfileInfo(payload);
+      if (success) {
+        updatePersonalInfo({
+          ...(payload.name !== undefined && { fullName: payload.name }),
+          ...(payload.dob !== undefined && { dateOfBirth: payload.dob }),
+          ...(payload.phone !== undefined && { phone: payload.phone }),
+          ...(payload.gender !== undefined && { gender: payload.gender }),
+        });
+        void hapticSuccess();
+        setActiveModal(null);
+        await loadProfile();
+      } else {
+        Alert.alert('Update Failed', 'Unable to save profile changes. Please try again.');
+      }
+    } catch (err) {
+      console.log('[PERSONAL_INFO] Save error:', err);
+      Alert.alert('Error', 'An error occurred while updating profile.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const pickAvatar = () => {
-    Alert.alert('Update Profile Photo', 'Choose a placeholder avatar', [
-      { text: 'Default', onPress: () => updatePersonalInfo({ avatarKey: 'logo' as AvatarKey }) },
-      {
-        text: 'AI Companion',
-        onPress: () => updatePersonalInfo({ avatarKey: 'ai-companion' as AvatarKey }),
-      },
-      {
-        text: 'Therapist',
-        onPress: () => updatePersonalInfo({ avatarKey: 'therapist' as AvatarKey }),
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
-  const clearError = (key: string) => {
-    if (errors[key]) {
-      setErrors((e) => {
-        const next = { ...e };
-        delete next[key];
-        return next;
-      });
-    }
-  };
-
-  const isValid =
-    isRequired(personalInfo.fullName) &&
-    isValidPhone(personalInfo.phone) &&
-    (!personalInfo.email || isValidEmail(personalInfo.email)) &&
-    (!personalInfo.dateOfBirth || isValidDateOfBirth(personalInfo.dateOfBirth));
+  const displayGender = personalInfo.gender && personalInfo.gender !== 'Not specified'
+    ? personalInfo.gender
+    : 'Gender';
 
   return (
-    <FormScreen>
-      <AppHeader
-        title="Personal Information"
-        onBack={() => (handleBack() ? undefined : navigation.goBack())}
-      />
-
-      <View style={styles.avatarSection}>
-        {getAvatarImage(personalInfo.avatarKey) ? (
-          <Image source={getAvatarImage(personalInfo.avatarKey)!} style={styles.avatarImage} />
-        ) : (
-          <View style={[styles.avatarImage, styles.avatarPlaceholder]}>
-            <Icon name={Icons.profile} size={36} color={Colors.primary} />
-          </View>
-        )}
-        <TouchableOpacity
-          style={styles.cameraBtn}
-          activeOpacity={0.8}
-          onPress={pickAvatar}
-          {...buttonA11y('Update profile photo')}
-        >
-          <Icon name={Icons.camera} size={18} color={Colors.white} />
-        </TouchableOpacity>
-      </View>
-
-      <Text style={styles.sectionLabel}>Basics</Text>
-      <AppInput
-        label="Full Name"
-        placeholder="Enter your full name"
-        value={personalInfo.fullName}
-        onChangeText={(t) => {
-          updatePersonalInfo({ fullName: t });
-          clearError('fullName');
-        }}
-        error={errors.fullName}
-      />
-      <AppInput
-        label="Username"
-        placeholder="Choose a username"
-        value={personalInfo.username ?? ''}
-        onChangeText={(t) => {
-          updatePersonalInfo({
-            username: t.replace(/[^a-zA-Z0-9._]/g, '').toLowerCase().slice(0, 24),
-          });
-          clearError('username');
-        }}
-        autoCapitalize="none"
-        error={errors.username}
-      />
-      <AppInput
-        label="Email"
-        placeholder="Enter your email"
-        value={personalInfo.email}
-        onChangeText={(t) => {
-          updatePersonalInfo({ email: t });
-          clearError('email');
-        }}
-        keyboardType="email-address"
-        error={errors.email}
-      />
-      <AppInput
-        label="Phone Number"
-        placeholder="10-digit mobile number"
-        value={personalInfo.phone}
-        onChangeText={(t) => {
-          updatePersonalInfo({ phone: t.replace(/\D/g, '').slice(0, 10) });
-          clearError('phone');
-        }}
-        keyboardType="phone-pad"
-        error={errors.phone}
-      />
-
-      <Text style={styles.sectionLabel}>Details</Text>
-      <View style={styles.row}>
-        <View style={styles.half}>
-          <AppInput
-            label="Date of Birth"
-            placeholder="YYYY-MM-DD"
-            value={personalInfo.dateOfBirth}
-            onChangeText={(t) => {
-              const age = ageFromDateOfBirth(t);
-              updatePersonalInfo({
-                dateOfBirth: t,
-                age: age ? String(age) : personalInfo.age,
-              });
-              clearError('dateOfBirth');
+    <View style={[styles.screenRoot, { paddingTop: Math.max(insets.top, 16) }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 24) + 32 },
+        ]}
+      >
+        {/* Header Bar */}
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => {
+              void hapticLight();
+              navigation.goBack();
             }}
-            error={errors.dateOfBirth}
-          />
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Icon name="chevron-left" size={24} color="#0F172A" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Personal information</Text>
         </View>
-        <View style={styles.half}>
-          <AppInput
-            label="Gender"
-            placeholder="Gender"
-            value={personalInfo.gender}
-            onChangeText={(t) => updatePersonalInfo({ gender: t })}
-          />
+
+        {/* Circular Dynamic Initials Avatar */}
+        <View style={styles.avatarSection}>
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarInitials}>{initials}</Text>
+          </View>
         </View>
-      </View>
-      <AppInput
-        label="Institution"
-        placeholder="School, college, or workplace"
-        value={personalInfo.institution ?? ''}
-        onChangeText={(t) => updatePersonalInfo({ institution: t })}
-      />
-      <AppInput
-        label="Bio (optional)"
-        placeholder="A short note about you"
-        value={personalInfo.bio ?? ''}
-        onChangeText={(t) => updatePersonalInfo({ bio: t.slice(0, 160) })}
-        multiline
-        numberOfLines={3}
-      />
-      <AppInput
-        label="Address"
-        placeholder="Enter your address"
-        value={personalInfo.address}
-        onChangeText={(t) => updatePersonalInfo({ address: t })}
-        multiline
-        numberOfLines={2}
-      />
 
-      <Text style={styles.sectionLabel}>Emergency contact</Text>
-      <AppInput
-        label="Contact Name"
-        placeholder="Emergency contact name"
-        value={personalInfo.emergencyContactName ?? ''}
-        onChangeText={(t) => updatePersonalInfo({ emergencyContactName: t })}
-      />
-      <AppInput
-        label="Contact Number"
-        placeholder="Emergency contact phone"
-        value={personalInfo.emergencyContact}
-        onChangeText={(t) => {
-          updatePersonalInfo({ emergencyContact: t.replace(/\D/g, '').slice(0, 10) });
-          clearError('emergencyContact');
-        }}
-        keyboardType="phone-pad"
-        error={errors.emergencyContact}
-      />
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="small" color="#E86C28" />
+          </View>
+        ) : null}
 
-      <Text style={styles.sectionLabel}>Trusted contact</Text>
-      <AppInput
-        label="Name"
-        placeholder="Trusted contact name"
-        value={personalInfo.trustedContactName ?? ''}
-        onChangeText={(t) => updatePersonalInfo({ trustedContactName: t })}
-      />
-      <AppInput
-        label="Phone"
-        placeholder="Trusted contact phone"
-        value={personalInfo.trustedContactPhone ?? ''}
-        onChangeText={(t) => {
-          updatePersonalInfo({
-            trustedContactPhone: t.replace(/\D/g, '').slice(0, 10),
-          });
-          clearError('trustedContactPhone');
-        }}
-        keyboardType="phone-pad"
-        error={errors.trustedContactPhone}
-      />
-      <AppInput
-        label="Relation"
-        placeholder="e.g. Parent, Friend"
-        value={personalInfo.trustedContactRelation ?? ''}
-        onChangeText={(t) => updatePersonalInfo({ trustedContactRelation: t })}
-      />
+        {/* FIELD 1: NAME */}
+        <TouchableOpacity
+          style={styles.cardContainer}
+          onPress={() => openModal('name')}
+          activeOpacity={0.75}
+        >
+          <View style={styles.leftIconTextGroup}>
+            <View style={styles.iconBox}>
+              <Icon name="account-outline" size={20} color="#0F172A" />
+            </View>
+            <Text style={styles.cardValueText}>{personalInfo.fullName || 'Charan'}</Text>
+          </View>
+          <Icon name="chevron-right" size={18} color="#94A3B8" />
+        </TouchableOpacity>
 
-      {isDirty ? <Text style={styles.unsavedHint}>You have unsaved changes</Text> : null}
+        {/* FIELD 3: EMAIL (Read Only) */}
+        <View style={[styles.cardContainer, styles.readOnlyCard]}>
+          <View style={styles.leftIconTextGroup}>
+            <View style={styles.iconBox}>
+              <Icon name="email-outline" size={20} color="#0F172A" />
+            </View>
+            <View>
+              <Text style={styles.cardValueText}>{personalInfo.email || 'user@email.com'}</Text>
+              <Text style={styles.googleSubtext}>Managed by your Google account</Text>
+            </View>
+          </View>
+        </View>
 
-      <PrimaryButton
-        label="Save Changes"
-        onPress={handleSave}
-        disabled={!isValid || !isDirty || profileStatus === 'loading'}
-        loading={profileStatus === 'loading'}
-      />
-      {isDirty ? (
-        <SecondaryButton label="Discard Changes" onPress={() => setDiscardVisible(true)} />
-      ) : null}
+        {/* FIELD 5: GENDER */}
+        <TouchableOpacity
+          style={styles.cardContainer}
+          onPress={() => openModal('gender')}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.cardValueText}>{displayGender}</Text>
+          <Icon name="chevron-right" size={18} color="#94A3B8" />
+        </TouchableOpacity>
+      </ScrollView>
 
-      <DiscardChangesDialog
-        visible={discardVisible}
-        onCancel={() => setDiscardVisible(false)}
-        onConfirm={() => {
-          setDiscardVisible(false);
-          resetPersonalInfoDraft();
-          navigation.goBack();
-        }}
-      />
-    </FormScreen>
+      {/* EDIT MODAL */}
+      <Modal
+        visible={activeModal !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActiveModal(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setActiveModal(null)}
+        >
+          <TouchableOpacity style={styles.modalCard} activeOpacity={1}>
+            <Text style={styles.modalTitle}>
+              {activeModal === 'name' && 'Edit Name'}
+              {activeModal === 'dob' && 'Edit Date of Birth'}
+              {activeModal === 'phone' && 'Edit Phone Number'}
+              {activeModal === 'gender' && 'Select Gender'}
+            </Text>
+
+            {activeModal === 'name' && (
+              <TextInput
+                style={styles.modalInput}
+                value={nameVal}
+                onChangeText={setNameVal}
+                placeholder="Enter full name"
+                placeholderTextColor="#94A3B8"
+                autoFocus
+              />
+            )}
+
+            {activeModal === 'dob' && (
+              <View style={styles.dobPickerContainer}>
+                <Text style={styles.dobSelectedText}>
+                  {String(selectedDobDay).padStart(2, '0')}/
+                  {String(selectedDobMonth).padStart(2, '0')}/
+                  {selectedDobYear}
+                </Text>
+
+                {/* YEAR SELECTOR */}
+                <Text style={styles.dobPickerLabel}>SELECT YEAR</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pickerScrollRow}>
+                  {YEARS.map((yr) => (
+                    <TouchableOpacity
+                      key={yr}
+                      style={[
+                        styles.chipBtn,
+                        selectedDobYear === yr && styles.chipBtnActive,
+                      ]}
+                      onPress={() => {
+                        setSelectedDobYear(yr);
+                        setDobVal(`${String(selectedDobDay).padStart(2, '0')}/${String(selectedDobMonth).padStart(2, '0')}/${yr}`);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          selectedDobYear === yr && styles.chipTextActive,
+                        ]}
+                      >
+                        {yr}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {/* MONTH SELECTOR */}
+                <Text style={styles.dobPickerLabel}>SELECT MONTH</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pickerScrollRow}>
+                  {MONTHS.map((mName, mIdx) => {
+                    const mNum = mIdx + 1;
+                    return (
+                      <TouchableOpacity
+                        key={mName}
+                        style={[
+                          styles.chipBtn,
+                          selectedDobMonth === mNum && styles.chipBtnActive,
+                        ]}
+                        onPress={() => {
+                          setSelectedDobMonth(mNum);
+                          setDobVal(`${String(selectedDobDay).padStart(2, '0')}/${String(mNum).padStart(2, '0')}/${selectedDobYear}`);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            selectedDobMonth === mNum && styles.chipTextActive,
+                          ]}
+                        >
+                          {mName}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+
+                {/* DAY SELECTOR */}
+                <Text style={styles.dobPickerLabel}>SELECT DAY</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pickerScrollRow}>
+                  {DAYS.map((dNum) => (
+                    <TouchableOpacity
+                      key={dNum}
+                      style={[
+                        styles.chipBtn,
+                        selectedDobDay === dNum && styles.chipBtnActive,
+                      ]}
+                      onPress={() => {
+                        setSelectedDobDay(dNum);
+                        setDobVal(`${String(dNum).padStart(2, '0')}/${String(selectedDobMonth).padStart(2, '0')}/${selectedDobYear}`);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          selectedDobDay === dNum && styles.chipTextActive,
+                        ]}
+                      >
+                        {dNum}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {activeModal === 'phone' && (
+              <TextInput
+                style={styles.modalInput}
+                value={phoneVal}
+                onChangeText={setPhoneVal}
+                placeholder="Enter phone number"
+                placeholderTextColor="#94A3B8"
+                keyboardType="phone-pad"
+                autoFocus
+              />
+            )}
+
+            {activeModal === 'gender' && (
+              <View style={styles.genderOptionsList}>
+                {['Male', 'Female', 'Non-binary', 'Prefer not to say'].map((g) => (
+                  <TouchableOpacity
+                    key={g}
+                    style={[
+                      styles.genderOptionBtn,
+                      genderVal === g && styles.genderOptionSelected,
+                    ]}
+                    onPress={() => setGenderVal(g)}
+                  >
+                    <Text
+                      style={[
+                        styles.genderOptionText,
+                        genderVal === g && styles.genderOptionSelectedText,
+                      ]}
+                    >
+                      {g}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            <View style={styles.modalActionsRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setActiveModal(null)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalSaveBtn}
+                onPress={handleSaveField}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSaveText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  avatarSection: {
+  screenRoot: {
+    flex: 1,
+    backgroundColor: '#FAF6F0',
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  headerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.xl,
-    position: 'relative',
-    width: 100,
-    alignSelf: 'center',
+    marginBottom: 16,
+    gap: 12,
   },
-  avatarImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: Colors.calendarInactive,
-  },
-  avatarPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.peachMuted,
-  },
-  cameraBtn: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
+  backBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.textSecondary,
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  avatarSection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 12,
+  },
+  avatarCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+    position: 'relative',
+  },
+  avatarInitials: {
+    fontSize: 34,
+    fontWeight: '800',
+    color: '#D97706',
+  },
+  pencilBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#3B82F6',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingBox: {
+    paddingVertical: 8,
     alignItems: 'center',
   },
-  sectionLabel: {
-    ...Typography.caption,
-    color: Colors.textMuted,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: Spacing.sm,
-    marginTop: Spacing.sm,
-  },
-  row: {
+  cardContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    height: 64,
+    paddingHorizontal: 16,
     flexDirection: 'row',
-    gap: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  half: {
+  readOnlyCard: {
+    shadowOpacity: 0.02,
+  },
+  leftIconTextGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
     flex: 1,
   },
-  unsavedHint: {
-    ...Typography.caption,
-    color: Colors.primary,
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardValueText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  googleSubtext: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 16,
+  },
+  modalInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#0F172A',
+    marginBottom: 20,
+  },
+  genderOptionsList: {
+    gap: 8,
+    marginBottom: 20,
+  },
+  genderOptionBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  genderOptionSelected: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#F97316',
+  },
+  genderOptionText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  genderOptionSelectedText: {
+    color: '#EA580C',
+    fontWeight: '700',
+  },
+  modalActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  modalCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  modalCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  modalSaveBtn: {
+    backgroundColor: '#E86C28',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  modalSaveText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  dobPickerContainer: {
+    width: '100%',
+    marginBottom: 16,
+  },
+  dobSelectedText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#E86C28',
     textAlign: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: 12,
+  },
+  dobPickerLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 1,
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  pickerScrollRow: {
+    flexGrow: 0,
+    marginBottom: 6,
+  },
+  chipBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginRight: 6,
+  },
+  chipBtnActive: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#F97316',
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  chipTextActive: {
+    color: '#EA580C',
+    fontWeight: '800',
   },
 });

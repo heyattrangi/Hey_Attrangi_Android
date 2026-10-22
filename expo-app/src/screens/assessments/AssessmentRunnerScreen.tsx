@@ -1,32 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   View,
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Text,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Icon, AppIcons } from '../../components/app/Icon';
+import { Icon } from '../../components/app/Icon';
 import { SCREENERS, QuestionOption } from '../../data/assessmentsData';
 import { assessmentRepository } from '../../repositories/AssessmentRepository';
+import { scoreAssessment, getScreenerMaxScore } from '../../utils/scoreAssessment';
 import { MainStackParamList } from '../../navigation/types';
-import {
-  Screen,
-  Text,
-  Button,
-  Card,
-  Badge,
-  Colors,
-  Typography,
-  Spacing,
-  Radii,
-} from '../../design-system';
+import { AppScreen } from '../../components/app';
+import { Spacing } from '../../design-system';
+import { PremiumLimitModal } from '../../components/premium/PremiumLimitModal';
+import { RateLimitError } from '../../types/errors';
 import { hapticLight, hapticSelection, hapticSuccess } from '../../utils/haptics';
+import { useProfileStore } from '../../store/profileStore';
+import { useBillingStore } from '../../store/billingStore';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 type RouteProps = RouteProp<MainStackParamList, 'AssessmentRunner'>;
+
+const PROGRESSIVE_COLORS = [
+  '#FDE047', // 1. Light Yellow
+  '#FACC15', // 2. Golden Yellow
+  '#FB923C', // 3. Warm Orange
+  '#EA580C', // 4. Dark Orange
+  '#DC2626', // 5. Deep Red/Orange
+];
 
 export const AssessmentRunnerScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
@@ -35,59 +40,157 @@ export const AssessmentRunnerScreen: React.FC = () => {
   const assessmentKey = route.params?.assessmentKey || 'phq-9';
   const screener = SCREENERS[assessmentKey] || SCREENERS['phq-9'];
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [loading, setLoading] = useState<boolean>(false);
+  const [premiumModalVisible, setPremiumModalVisible] = useState<boolean>(false);
 
-  const currentQuestion = screener.questions[currentIndex];
-  const progressPercent = ((currentIndex + 1) / screener.questions.length) * 100;
+  const isAdvancing = useRef<boolean>(false);
 
-  const handleSelectOption = async (option: QuestionOption) => {
-    void hapticSelection();
+  useEffect(() => {
+    const runMountedCheck = async () => {
+      const userPlan = useProfileStore.getState().userPlan;
+      const activePlanId = useBillingStore.getState().activePlanId;
+      const isPremiumUser =
+        activePlanId === 'premium' || (userPlan && userPlan.toUpperCase() === 'PREMIUM');
 
-    const updatedAnswers = {
-      ...answers,
-      [currentQuestion.id]: option.value,
-    };
-    setAnswers(updatedAnswers);
-
-    if (currentIndex < screener.questions.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      // Completed all questions -> submit to backend
-      setLoading(true);
-      const responsesPayload = Object.entries(updatedAnswers).map(([qId, val]) => ({
-        questionId: qId,
-        selectedValue: val,
-      }));
+      if (isPremiumUser) return;
 
       try {
-        const res = await assessmentRepository.submitAssessment({
-          assessmentKey,
-          responses: responsesPayload,
-        });
+        await useProfileStore.getState().fetchPatientLimits();
+        const limits = useProfileStore.getState().patientLimits;
+        const assessmentUsage = limits?.usage?.assessments;
+        if (assessmentUsage) {
+          const remaining =
+            typeof assessmentUsage.remaining === 'number'
+              ? assessmentUsage.remaining
+              : parseInt(String(assessmentUsage.remaining), 10);
+          const used = assessmentUsage.used;
+          const limit =
+            typeof assessmentUsage.limit === 'number'
+              ? assessmentUsage.limit
+              : parseInt(String(assessmentUsage.limit), 10);
 
-        void hapticSuccess();
-        const finalResult = res.result || {
-          score: Object.values(updatedAnswers).reduce((a, b) => a + b, 0),
-          severity: 'Completed',
-          interpretation: `Completed ${screener.title}`,
-        };
-
-        navigation.replace('AssessmentResult', { result: finalResult });
+          if ((!Number.isNaN(remaining) && remaining <= 0) || (used >= limit && limit > 0)) {
+            setPremiumModalVisible(true);
+          }
+        }
       } catch {
-        // Fallback local scoring if offline
-        const localScore = Object.values(updatedAnswers).reduce((a, b) => a + b, 0);
-        navigation.replace('AssessmentResult', {
-          result: {
-            score: localScore,
-            severity: localScore > 10 ? 'Moderate' : 'Mild',
-            interpretation: `Completed ${screener.title}`,
-          },
-        });
-      } finally {
-        setLoading(false);
+        // Infrastructure error -> allow attempt
       }
+    };
+    void runMountedCheck();
+  }, []);
+
+  const totalQuestions = screener.questions.length;
+  const currentQuestion = screener.questions[currentIndex] || screener.questions[0];
+  const progressRatio = (currentIndex + 1) / totalQuestions;
+
+  const submitAssessmentPayload = async (finalAnswers: Record<number, number>) => {
+    setLoading(true);
+
+    const responsesPayload = Object.entries(finalAnswers).map(([idxStr, val]) => {
+      const idx = parseInt(idxStr, 10);
+      const q = screener.questions[idx];
+      return {
+        questionId: q ? q.id : `q_${idx}`,
+        selectedValue: val,
+      };
+    });
+
+    try {
+      const res = await assessmentRepository.submitAssessment({
+        assessmentKey,
+        responses: responsesPayload,
+      });
+
+      void hapticSuccess();
+      const calculatedMaxScore = getScreenerMaxScore(assessmentKey, screener);
+      const fallbackCalculated = scoreAssessment(assessmentKey, screener, finalAnswers);
+
+      const finalResult = res.result
+        ? {
+            ...res.result,
+            maxScore: (res.result as any).maxScore || calculatedMaxScore,
+          }
+        : {
+            ...fallbackCalculated,
+          };
+
+      navigation.replace('AssessmentResult', { result: finalResult });
+    } catch (err: any) {
+      console.error('[ASSESSMENT RUNNER] Error submitting assessment:', err);
+      if (
+        err instanceof RateLimitError ||
+        (err?.message && (err.message.includes('429') || err.message.includes('LIMIT_EXCEEDED') || err.message.includes('limit')))
+      ) {
+        setPremiumModalVisible(true);
+        return;
+      }
+      // Fallback local Web-parity scoring if offline
+      const fallbackResult = scoreAssessment(assessmentKey, screener, finalAnswers);
+      navigation.replace('AssessmentResult', {
+        result: fallbackResult,
+      });
+    } finally {
+      setLoading(false);
+      isAdvancing.current = false;
+    }
+  };
+
+  const handleSelectOption = (option: QuestionOption) => {
+    if (isAdvancing.current || loading) return;
+    isAdvancing.current = true;
+
+    void hapticSelection();
+    const nextAnswers = { ...answers, [currentIndex]: option.value };
+    setAnswers(nextAnswers);
+
+    // Skip & Gate Logic Evaluation matching Web implementation
+    const skip = screener.skipLogic;
+
+    // 1. PTSD Trauma Exposure Gate Question
+    if (currentQuestion.isGate && option.value === 0) {
+      setTimeout(() => {
+        void submitAssessmentPayload(nextAnswers);
+      }, 300);
+      return;
+    }
+
+    // 2. C-SSRS Skip Logic
+    if (
+      skip?.type === 'c-ssrs' &&
+      currentIndex === skip.gateQuestionIndex &&
+      option.value === skip.gateNoValue
+    ) {
+      setTimeout(() => {
+        isAdvancing.current = false;
+        setCurrentIndex(skip.jumpToIndex);
+      }, 300);
+      return;
+    }
+
+    // 3. ASQ Gate Logic
+    if (skip?.type === 'asq' && currentIndex === Math.max(...skip.gateQuestionIndices)) {
+      const anyYes = skip.gateQuestionIndices.some((i: number) => (nextAnswers[i] ?? 0) > 0);
+      if (!anyYes) {
+        setTimeout(() => {
+          void submitAssessmentPayload(nextAnswers);
+        }, 300);
+        return;
+      }
+    }
+
+    // Standard Linear Question Progression vs Final Submission
+    if (currentIndex < totalQuestions - 1) {
+      setTimeout(() => {
+        isAdvancing.current = false;
+        setCurrentIndex((prev) => prev + 1);
+      }, 300);
+    } else {
+      setTimeout(() => {
+        void submitAssessmentPayload(nextAnswers);
+      }, 300);
     }
   };
 
@@ -98,173 +201,295 @@ export const AssessmentRunnerScreen: React.FC = () => {
     }
   };
 
+  const handleNext = () => {
+    if (answers[currentIndex] === undefined) return;
+    void hapticLight();
+    if (currentIndex < totalQuestions - 1) {
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      void submitAssessmentPayload(answers);
+    }
+  };
+
+  const selectedVal = answers[currentIndex];
+  const selectedIndex = currentQuestion.options.findIndex((opt) => opt.value === selectedVal);
+
   return (
-    <Screen backgroundColor={Colors.background}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => {
-            void hapticLight();
-            navigation.goBack();
-          }}
-        >
-          <Icon name={AppIcons.back} size={20} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <Text variant="heading1" style={styles.headerTitle}>
-          {screener.title}
-        </Text>
-      </View>
+    <AppScreen scrollable={false} gradient="none" style={{ backgroundColor: '#FAF8F5' }}>
+      <ScrollView contentContainerStyle={styles.runnerContainer} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.topHeaderRow}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => {
+              void hapticLight();
+              navigation.goBack();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Go Back"
+          >
+            <Icon name="chevron-left" size={20} color="#1E293B" />
+          </TouchableOpacity>
 
-      {/* Progress Bar */}
-      <View style={styles.progressContainer}>
-        <View style={styles.track}>
-          <View style={[styles.fill, { width: `${progressPercent}%` }]} />
+          <Text style={styles.screenerHeaderTitle} numberOfLines={1}>
+            {screener.title}
+          </Text>
+
+          <View style={{ width: 32 }} />
         </View>
-        <Text variant="caption" color={Colors.textMuted} style={styles.progressText}>
-          Question {currentIndex + 1} of {screener.questions.length} ({Math.round(progressPercent)}%)
-        </Text>
-      </View>
 
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        {/* Thin Clean Top Progress Bar */}
+        <View style={styles.thinProgressBarTrack}>
+          <View style={[styles.thinProgressBarFill, { width: `${progressRatio * 100}%` }]} />
+        </View>
+
+        <View style={styles.verticalBreathingSpace} />
+
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.brandPrimary} />
-            <Text variant="bodyMedium" color={Colors.textSecondary} style={styles.loadingText}>
-              Analyzing your clinical answers...
-            </Text>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#F97316" />
+            <Text style={styles.loadingText}>Analyzing your answers...</Text>
           </View>
         ) : (
-          <Card variant="default" style={styles.questionCard}>
-            <Badge variant="brand" label={`Question ${currentIndex + 1}`} />
-
-            <Text variant="heading2" style={styles.questionText}>
-              {currentQuestion.text}
-            </Text>
-
-            <View style={styles.optionsList}>
-              {currentQuestion.options.map((opt, i) => {
-                const isSelected = answers[currentQuestion.id] === opt.value;
-                return (
-                  <TouchableOpacity
-                    key={i}
-                    style={[styles.optionBtn, isSelected && styles.optionBtnSelected]}
-                    onPress={() => handleSelectOption(opt)}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      variant="bodyMedium"
-                      style={[styles.optionText, isSelected ? styles.optionTextSelected : {}]}
-                    >
-                      {opt.text}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+          <View style={styles.mainContentWrapper}>
+            {/* Fixed Question Area (RESERVED HEIGHT so question length never moves the answer scale) */}
+            <View style={styles.fixedQuestionArea}>
+              <Text style={styles.questionPromptText}>{currentQuestion.text}</Text>
             </View>
 
-            {currentIndex > 0 ? (
-              <Button
-                variant="secondary"
-                label="← Previous Question"
+            {/* Fixed Answer Scale Section */}
+            <View style={styles.fixedAnswerArea}>
+              {/* Horizontal Scale of Answer Boxes with Progressive Coloring */}
+              <View style={styles.scaleBoxesRow}>
+                {currentQuestion.options.map((opt, i) => {
+                  const isColored = selectedIndex !== -1 && i <= selectedIndex;
+                  const bg = isColored
+                    ? PROGRESSIVE_COLORS[i % PROGRESSIVE_COLORS.length]
+                    : '#E4E4E7';
+
+                  return (
+                    <TouchableOpacity
+                      key={i}
+                      style={[styles.scaleBox, { backgroundColor: bg }]}
+                      onPress={() => handleSelectOption(opt)}
+                      activeOpacity={0.85}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: answers[currentIndex] === opt.value }}
+                    />
+                  );
+                })}
+              </View>
+
+              {/* Dynamic Labels Underneath Each Box */}
+              <View style={styles.scaleLabelsRow}>
+                {currentQuestion.options.map((opt, i) => (
+                  <Text key={i} style={styles.scaleLabelText} numberOfLines={2}>
+                    {opt.text}
+                  </Text>
+                ))}
+              </View>
+            </View>
+
+            {/* Previous & Next Navigation Controls */}
+            <View style={styles.navControlsRow}>
+              <TouchableOpacity
+                style={styles.subtleNavBtn}
+                disabled={currentIndex === 0}
                 onPress={handlePrevious}
-                style={styles.prevBtn}
-              />
-            ) : null}
-          </Card>
+                activeOpacity={0.7}
+              >
+                <View style={styles.navBtnInner}>
+                  <Icon name="chevron-left" size={16} color={currentIndex === 0 ? '#CBD5E1' : '#475569'} />
+                  <Text
+                    style={[
+                      styles.subtleNavBtnText,
+                      currentIndex === 0 && styles.subtleNavBtnTextDisabled,
+                    ]}
+                  >
+                    Previous
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.subtleNavBtn}
+                disabled={answers[currentIndex] === undefined}
+                onPress={handleNext}
+                activeOpacity={0.7}
+              >
+                <View style={styles.navBtnInner}>
+                  <Text
+                    style={[
+                      styles.subtleNavBtnText,
+                      answers[currentIndex] === undefined && styles.subtleNavBtnTextDisabled,
+                    ]}
+                  >
+                    Next
+                  </Text>
+                  <Icon name="chevron-right" size={16} color={answers[currentIndex] === undefined ? '#CBD5E1' : '#475569'} />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Flexible Spacer */}
+            <View style={styles.flexibleSpacer} />
+
+            {/* Confidentiality Message Anchored at Bottom */}
+            <Text style={styles.confidentialityText}>
+              Responses are completely confidential
+            </Text>
+          </View>
         )}
       </ScrollView>
-    </Screen>
+
+      {/* Premium Limit Popup */}
+      <PremiumLimitModal
+        visible={premiumModalVisible}
+        cardType="ASSESSMENT"
+        onDismiss={() => setPremiumModalVisible(false)}
+        onUpgrade={() => {
+          setPremiumModalVisible(false);
+          navigation.navigate('SubscriptionComparison');
+        }}
+      />
+    </AppScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  header: {
+  runnerContainer: {
+    flexGrow: 1,
+    paddingHorizontal: 18,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xl * 1.5,
+  },
+  topHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
-    marginBottom: Spacing.xs,
-    gap: Spacing.sm,
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
   backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.borderDefault,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.textPrimary,
+  screenerHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1E293B',
+    textAlign: 'center',
     flex: 1,
   },
-  progressContainer: {
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  track: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.borderDefault,
+  thinProgressBarTrack: {
+    height: 4,
+    backgroundColor: '#E4E4E7',
+    borderRadius: 2,
     overflow: 'hidden',
     marginBottom: 4,
   },
-  fill: {
+  thinProgressBarFill: {
     height: '100%',
-    backgroundColor: Colors.brandPrimary,
+    backgroundColor: '#2563EB',
+    borderRadius: 2,
   },
-  progressText: {
-    textAlign: 'right',
+  verticalBreathingSpace: {
+    height: 24,
   },
-  container: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.xl,
+  mainContentWrapper: {
+    flex: 1,
+    paddingHorizontal: 4,
   },
-  loadingContainer: {
+  fixedQuestionArea: {
+    minHeight: 140,
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  questionPromptText: {
+    fontSize: 19.5,
+    fontWeight: '600',
+    color: '#1E293B',
+    lineHeight: 28,
+    letterSpacing: -0.3,
+  },
+  fixedAnswerArea: {
+    marginBottom: 24,
+  },
+  scaleBoxesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  scaleBox: {
+    flex: 1,
+    height: 50,
+    borderRadius: 16,
+  },
+  scaleLabelsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 6,
+    paddingHorizontal: 2,
+  },
+  scaleLabelText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 15,
+  },
+  navControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    marginBottom: 16,
+  },
+  subtleNavBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  navBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  subtleNavBtnText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#475569',
+  },
+  subtleNavBtnTextDisabled: {
+    color: '#CBD5E1',
+  },
+  flexibleSpacer: {
+    flex: 1,
+    minHeight: 32,
+  },
+  confidentialityText: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#94A3B8',
+    textAlign: 'center',
+    paddingBottom: 8,
+  },
+  loadingBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    padding: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.xl,
+    gap: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   loadingText: {
-    marginTop: Spacing.md,
-  },
-  questionCard: {
-    padding: Spacing.lg,
-    gap: Spacing.md,
-  },
-  questionText: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-    lineHeight: 28,
-  },
-  optionsList: {
-    gap: Spacing.sm,
-  },
-  optionBtn: {
-    backgroundColor: Colors.background,
-    borderRadius: Radii.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.borderDefault,
-  },
-  optionBtnSelected: {
-    backgroundColor: Colors.brandLight,
-    borderColor: Colors.brandPrimary,
-  },
-  optionText: {
     fontSize: 15,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  optionTextSelected: {
-    color: Colors.brandPrimary,
-  },
-  prevBtn: {
-    marginTop: Spacing.md,
+    fontWeight: '600',
+    color: '#64748B',
   },
 });

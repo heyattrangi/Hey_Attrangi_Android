@@ -1,395 +1,549 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   StyleSheet,
   View,
   ScrollView,
   TouchableOpacity,
-  Alert,
-  Switch,
+  Image,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Icon, AppIcons } from '../../components/app/Icon';
-import { useAuthStore } from '../../store/authStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Rect, Circle, Path } from 'react-native-svg';
+import { FLOATING_NAV_TOKENS } from '../../components/navigation/FloatingBottomTabBar';
+import { Icon } from '../../components/app/Icon';
 import { useProfileStore } from '../../store/profileStore';
+import { useBillingStore } from '../../store/billingStore';
 import { profileRepository } from '../../repositories/ProfileRepository';
 import { MainStackParamList } from '../../navigation/types';
-import {
-  Screen,
-  Text,
-  Button,
-  Card,
-  Badge,
-  Input,
-  Chip,
-  Avatar,
-  Divider,
-  Colors,
-  Typography,
-  Spacing,
-  Radii,
-} from '../../design-system';
-import { hapticLight, hapticSuccess, hapticError, hapticSelection } from '../../utils/haptics';
+import { Text, Spacing } from '../../design-system';
+import { hapticLight, hapticSelection } from '../../utils/haptics';
+import { deriveUserIdentity } from '../../utils/userIdentity';
+import { getHttpClient } from '../../network';
 
 type NavigationProp = NativeStackNavigationProp<MainStackParamList>;
 
-const LANGUAGES = ['English', 'Hindi', 'Telugu', 'Tamil', 'Kannada', 'Malayalam', 'Marathi', 'Bengali'];
-
 export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const logout = useAuthStore((s) => s.logout);
-
+  const insets = useSafeAreaInsets();
   const personalInfo = useProfileStore((s) => s.personalInfo);
-  const updatePersonalInfo = useProfileStore((s) => s.updatePersonalInfo);
-  const savePersonalInfo = useProfileStore((s) => s.savePersonalInfo);
 
-  // Form States
   const [fullName, setFullName] = useState(personalInfo.fullName || '');
-  const [email] = useState(personalInfo.email || '');
-  const [phone, setPhone] = useState(personalInfo.phone || '');
-  const [dob, setDob] = useState(personalInfo.dateOfBirth || '');
-  const [selectedLanguage, setSelectedLanguage] = useState('English');
-
-  const [emergencyName, setEmergencyName] = useState(personalInfo.emergencyContactName || '');
-  const [emergencyPhone, setEmergencyPhone] = useState(personalInfo.emergencyContact || '');
-
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [savingEmergency, setSavingEmergency] = useState(false);
+  const [email, setEmail] = useState(personalInfo.email || '');
+  const [userPlan, setUserPlan] = useState('FREE');
+  const [stats, setStats] = useState({
+    activeDays: 8,
+    moodCheckIns: 6,
+    reflections: 2,
+  });
 
   useEffect(() => {
-    async function loadProfile() {
+    async function loadProfileData() {
       try {
         const res = await profileRepository.getMobileMe();
-        if (res && res.name) {
-          setFullName(res.name);
+        if (res) {
+          if (res.name && res.name.toLowerCase() !== 'patient') {
+            setFullName(res.name);
+          }
+          if (res.email) {
+            setEmail(res.email);
+          }
+          if (res.plan) {
+            setUserPlan(res.plan);
+            useBillingStore.setState({
+              activePlanId: res.plan.toUpperCase() === 'PREMIUM' ? 'premium' : res.plan.toLowerCase() as any,
+            });
+          }
         }
       } catch {
-        // Fallback
+        // Hydrate from store fallback
       }
     }
-    void loadProfile();
+
+    async function loadMoodStats() {
+      try {
+        const http = getHttpClient();
+        const res = await http.get<{ entries?: any[] }>('/api/patient/mood');
+        if (res.data && Array.isArray(res.data.entries) && res.data.entries.length > 0) {
+          const entries = res.data.entries;
+          const moodCount = entries.length;
+          const uniqueDays = new Set(
+            entries.map((e: any) =>
+              new Date(e.timestamp || e.createdAt || Date.now()).toDateString(),
+            ),
+          );
+          const reflectionCount = entries.filter(
+            (e: any) => e.note && typeof e.note === 'string' && e.note.trim().length > 0,
+          ).length;
+
+          setStats({
+            activeDays: Math.max(uniqueDays.size, 1),
+            moodCheckIns: moodCount,
+            reflections: Math.max(reflectionCount, 1),
+          });
+        }
+      } catch {
+        // Retain design reference defaults (8 active days, 6 check-ins, 2 reflections)
+      }
+    }
+
+    void loadProfileData();
+    void loadMoodStats();
   }, []);
 
-  const handleSavePersonalInfo = async () => {
-    setSaving(true);
-    void hapticLight();
-    try {
-      updatePersonalInfo({
-        fullName,
-        phone,
-        dateOfBirth: dob,
-      });
-      await savePersonalInfo();
-      void hapticSuccess();
-      Alert.alert('Profile Saved', 'Your personal details have been updated.');
-    } catch {
-      void hapticError();
-    } finally {
-      setSaving(false);
-    }
-  };
+  const storeUserPlan = useProfileStore((s) => s.userPlan);
+  const activePlanId = useBillingStore((s) => s.activePlanId);
 
-  const handleSaveEmergency = async () => {
-    setSavingEmergency(true);
-    void hapticLight();
-    try {
-      updatePersonalInfo({
-        emergencyContactName: emergencyName,
-        emergencyContact: emergencyPhone,
-      });
-      await savePersonalInfo();
-      void hapticSuccess();
-      Alert.alert('Saved', 'Emergency contact updated.');
-    } catch {
-      void hapticError();
-    } finally {
-      setSavingEmergency(false);
-    }
-  };
+  const userIdentity = useMemo(
+    () =>
+      deriveUserIdentity(
+        fullName || personalInfo.fullName,
+        email || personalInfo.email,
+        personalInfo.profileImageUrl,
+      ),
+    [fullName, email, personalInfo.fullName, personalInfo.email, personalInfo.profileImageUrl],
+  );
 
-  const handleSignOut = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out of Hey Attrangi?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign Out',
-        style: 'destructive',
-        onPress: () => {
-          void hapticLight();
-          logout();
-        },
-      },
-    ]);
-  };
+  const displayName = userIdentity.fullName;
+  const initials = userIdentity.initial;
+  const displayEmail = email || personalInfo.email || 'user@example.com';
+  const isPremiumUser =
+    userPlan.toUpperCase() === 'PREMIUM' ||
+    (storeUserPlan && storeUserPlan.toUpperCase() === 'PREMIUM') ||
+    activePlanId === 'premium';
 
-  const canGoBack = navigation.canGoBack();
+  console.log(`[PREMIUM_DEBUG] ProfileScreen: userPlan=${userPlan} storeUserPlan=${storeUserPlan} activePlanId=${activePlanId} -> isPremiumUser=${isPremiumUser}`);
 
   return (
-    <Screen backgroundColor={Colors.background}>
-      <View style={styles.header}>
-        {canGoBack ? (
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => {
-              void hapticLight();
+    <View style={styles.screenRoot}>
+      {/* 1. TOP HEADER BAR */}
+      <View style={[styles.headerBar, { paddingTop: Math.max(insets.top, 12) + 4 }]}>
+        <TouchableOpacity
+          style={styles.headerBtn}
+          onPress={() => {
+            void hapticLight();
+            if (navigation.canGoBack()) {
               navigation.goBack();
-            }}
-          >
-            <Icon name={AppIcons.back} size={20} color={Colors.textPrimary} />
-          </TouchableOpacity>
-        ) : null}
-        <Text variant="heading1" style={styles.headerTitle}>
-          Profile Settings
-        </Text>
+            } else {
+              navigation.navigate('MainTabs' as any, { screen: 'HomeTab' });
+            }
+          }}
+          activeOpacity={0.7}
+        >
+          <Icon name="arrow-left" size={22} color="#0F172A" />
+        </TouchableOpacity>
+
+        <Text style={styles.headerTitle}>Profile</Text>
+
+        <TouchableOpacity
+          style={styles.headerBtn}
+          onPress={() => {
+            void hapticSelection();
+            navigation.navigate('Settings');
+          }}
+          activeOpacity={0.7}
+        >
+          <Icon name="cog-outline" size={22} color="#0F172A" />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        {/* User Identity Card */}
-        <Card variant="default" style={styles.identityCard}>
-          <View style={styles.identityRow}>
-            <Avatar size={64} backgroundColor={Colors.brandLight}>
-              <Text variant="heading1" color={Colors.brandPrimary}>
-                {(fullName || 'User').charAt(0).toUpperCase()}
-              </Text>
-            </Avatar>
-            <View style={styles.identityMeta}>
-              <Text variant="heading2" style={styles.userName}>
-                {fullName || 'Patient User'}
-              </Text>
-              <Text variant="bodyMedium" color={Colors.textSecondary}>
-                {email || 'patient@heyattrangi.app'}
-              </Text>
-              <View style={styles.badgeRow}>
-                <Badge variant="brand" label="FREE PLAN" />
-                <Badge variant="teal" label="PATIENT" />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingBottom:
+              FLOATING_NAV_TOKENS.CONTENT_BOTTOM_INSET +
+              (Platform.OS === 'ios' ? insets.bottom : 0),
+          },
+        ]}
+      >
+        {/* 2. AVATAR & USER IDENTITY */}
+        <View style={styles.identityContainer}>
+          <View style={[styles.avatarCircle, isPremiumUser && styles.avatarCirclePremium]}>
+            {personalInfo.profileImageUrl ? (
+              <Image source={{ uri: personalInfo.profileImageUrl }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarInitials}>{initials}</Text>
+            )}
+          </View>
+
+          <View style={styles.nameRow}>
+            <Text style={styles.nameText}>{displayName}</Text>
+            {isPremiumUser && (
+              <View style={styles.headerBadgeCrown}>
+                <Icon name="crown" size={16} color="#F59E0B" />
               </View>
+            )}
+          </View>
+
+          <View style={styles.emailRow}>
+            <Text style={styles.emailText}>{displayEmail}</Text>
+            <View style={{ marginLeft: 6 }}>
+              <Icon name="check-circle" size={16} color="#22C55E" />
             </View>
           </View>
-        </Card>
+        </View>
 
-        {/* Personal Details Form */}
-        <Card variant="default" style={styles.sectionCard}>
-          <Text variant="heading3" style={styles.sectionTitle}>
-            Personal Details
-          </Text>
+        {/* 3. STATISTICS CARD */}
+        <View style={styles.statsCard}>
+          <View style={styles.statCol}>
+            <Icon name="trophy-outline" size={20} color="#4F46E5" />
+            <Text style={styles.statNumber}>{stats.activeDays}</Text>
+            <Text style={styles.statLabel}>Active days</Text>
+          </View>
 
-          <Input
-            label="Full Name"
-            placeholder="Enter your name"
-            value={fullName}
-            onChangeText={setFullName}
-          />
+          <View style={styles.statDivider} />
 
-          <Input
-            label="Email Address"
-            placeholder="Email"
-            value={email}
-            editable={false}
-          />
+          <View style={styles.statCol}>
+            <Icon name="emoticon-happy-outline" size={20} color="#4F46E5" />
+            <Text style={styles.statNumber}>{stats.moodCheckIns}</Text>
+            <Text style={styles.statLabel}>Mood check-ins</Text>
+          </View>
 
-          <Input
-            label="Phone Number"
-            placeholder="+91 9876543210"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-          />
+          <View style={styles.statDivider} />
 
-          <Input
-            label="Date of Birth"
-            placeholder="YYYY-MM-DD"
-            value={dob}
-            onChangeText={setDob}
-          />
+          <View style={styles.statCol}>
+            <Icon name="pencil-outline" size={20} color="#4F46E5" />
+            <Text style={styles.statNumber}>{stats.reflections}</Text>
+            <Text style={styles.statLabel}>Reflections</Text>
+          </View>
+        </View>
 
-          <Button
-            variant="primary"
-            label={saving ? 'Saving...' : 'Save Changes'}
-            onPress={handleSavePersonalInfo}
-            disabled={saving}
-          />
-        </Card>
+        {/* 4. PREMIUM CARD (ACTIVE CONFIRMATION VS FREE UPSELL) */}
+        {isPremiumUser ? (
+          <View style={styles.premiumActiveCard}>
+            <View style={styles.premiumActiveHeader}>
+              <Icon name="crown" size={22} color="#F59E0B" />
+              <Text style={styles.premiumActiveTitle}>Premium Member</Text>
+            </View>
+            <Text style={styles.premiumActiveSubtitle}>
+              Congratulations! You're a Premium member of Hey Attrangi.{'\n'}
+              Your Premium plan is active and you now have access to all Premium features.
+            </Text>
+            <View style={styles.premiumFeatureList}>
+              <Text style={styles.premiumFeatureItem}>✓ Unlimited AI companion access</Text>
+              <Text style={styles.premiumFeatureItem}>✓ Premium wellness features</Text>
+              <Text style={styles.premiumFeatureItem}>✓ Premium assessments & content</Text>
+              <Text style={styles.premiumFeatureItem}>✓ All Premium features unlocked</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.premiumCard}>
+            <View style={styles.premiumLeftContent}>
+              <Text style={styles.premiumTitle}>Unlock All Features</Text>
+              <Text style={styles.premiumSubtitle}>
+                AI Insights, Weekly Summaries, Advanced{'\n'}Dashboard, Longer Recordings and more.
+              </Text>
 
-        {/* Emergency Contact */}
-        <Card variant="default" style={styles.sectionCard}>
-          <Text variant="heading3" style={styles.sectionTitle}>
-            Emergency Contact
-          </Text>
-          <Text variant="bodyMedium" color={Colors.textSecondary}>
-            Trusted person to notify in case of crisis support.
-          </Text>
+              <TouchableOpacity
+                style={styles.upgradeBtn}
+                onPress={() => {
+                  void hapticSelection();
+                  navigation.navigate('Subscription');
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.upgradeBtnText}>Upgrade to Premium</Text>
+              </TouchableOpacity>
+            </View>
 
-          <Input
-            label="Contact Name"
-            placeholder="e.g. Spouse / Parent"
-            value={emergencyName}
-            onChangeText={setEmergencyName}
-          />
-
-          <Input
-            label="Phone Number"
-            placeholder="+91 9876543210"
-            value={emergencyPhone}
-            onChangeText={setEmergencyPhone}
-            keyboardType="phone-pad"
-          />
-
-          <Button
-            variant="secondary"
-            label={savingEmergency ? 'Saving...' : 'Save Emergency Contact'}
-            onPress={handleSaveEmergency}
-            disabled={savingEmergency}
-          />
-        </Card>
-
-        {/* Preferences & Language */}
-        <Card variant="default" style={styles.sectionCard}>
-          <Text variant="heading3" style={styles.sectionTitle}>
-            App Preferences
-          </Text>
-
-          <Text variant="caption" color={Colors.textMuted} style={styles.subHeading}>
-            PREFERRED LANGUAGE
-          </Text>
-
-          <View style={styles.chipGrid}>
-            {LANGUAGES.map((lang) => {
-              const isSelected = selectedLanguage === lang;
-              return (
-                <Chip
-                  key={lang}
-                  label={lang}
-                  selected={isSelected}
-                  onPress={() => {
-                    void hapticSelection();
-                    setSelectedLanguage(lang);
-                  }}
+            {/* Golden Diamond Emblem */}
+            <View style={styles.premiumBadgeWrapper}>
+              <Svg width="54" height="54" viewBox="0 0 60 60" fill="none">
+                <Rect
+                  x="30"
+                  y="4"
+                  width="36"
+                  height="36"
+                  rx="8"
+                  transform="rotate(45 30 4)"
+                  fill="#F59E0B"
                 />
-              );
-            })}
-          </View>
-
-          <Divider />
-
-          <View style={styles.switchRow}>
-            <View style={styles.switchTextCol}>
-              <Text variant="heading3" style={styles.switchLabel}>
-                Push Notifications
-              </Text>
-
-              <Text variant="bodyMedium" color={Colors.textSecondary}>
-                Daily wellness check-ins & reflection reminders
-              </Text>
+                <Circle cx="30" cy="29.5" r="7" fill="#78350F" />
+              </Svg>
             </View>
-
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={(val) => {
-                void hapticLight();
-                setNotificationsEnabled(val);
-              }}
-              trackColor={{ false: Colors.borderDefault, true: Colors.brandLight }}
-              thumbColor={notificationsEnabled ? Colors.brandPrimary : Colors.surface}
-            />
           </View>
-        </Card>
+        )}
 
-        {/* Sign Out CTA */}
-        <Button
-          variant="secondary"
-          label="Sign Out"
-          onPress={handleSignOut}
-          style={styles.signOutBtn}
-        />
+        {/* 5. FOUNDER MESSAGE CARD */}
+        <TouchableOpacity
+          style={styles.founderCard}
+          onPress={() => {
+            void hapticSelection();
+            navigation.navigate('FounderMessage');
+          }}
+          activeOpacity={0.85}
+        >
+          <View style={styles.founderLeftGroup}>
+            <View style={styles.founderIconPill}>
+              <Icon name="bell-outline" size={20} color="#EA580C" />
+            </View>
+            <Text style={styles.founderTitleText}>A MESSAGE FROM OUR FOUNDER</Text>
+          </View>
+
+          <Icon name="chevron-right" size={18} color="#94A3B8" />
+        </TouchableOpacity>
       </ScrollView>
-    </Screen>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  header: {
+  screenRoot: {
+    flex: 1,
+    backgroundColor: '#FAF6F0',
+  },
+  headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
-    marginBottom: Spacing.xs,
-    gap: Spacing.sm,
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: 12,
+    backgroundColor: '#FAF6F0',
   },
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.borderDefault,
+  headerBtn: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  identityContainer: {
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+    paddingHorizontal: Spacing.lg,
+  },
+  avatarCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#0E3D60',
+    borderWidth: 3,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  avatarCirclePremium: {
+    borderWidth: 3,
+    borderColor: '#F59E0B',
+  },
+  avatarImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+  },
+  avatarInitials: {
+    fontSize: 34,
+    lineHeight: 42,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    paddingTop: 2,
+  },
+  nameText: {
     fontSize: 24,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: '#0F172A',
+    marginBottom: 4,
+    textAlign: 'center',
   },
-  container: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    paddingBottom: Spacing.xl,
-    gap: Spacing.md,
-  },
-  identityCard: {
-    padding: Spacing.lg,
-  },
-  identityRow: {
+  emailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
+    justifyContent: 'center',
   },
-  identityMeta: {
+  emailText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  statsCard: {
+    backgroundColor: '#FAF6F0',
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+    paddingVertical: 18,
+    paddingHorizontal: 8,
+    marginTop: 24,
+    marginHorizontal: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statCol: {
     flex: 1,
-    gap: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  userName: {
-    fontSize: 18,
+  statNumber: {
+    fontSize: 22,
     fontWeight: '800',
+    color: '#0F172A',
+    marginTop: 6,
+    marginBottom: 2,
   },
-  badgeRow: {
-    flexDirection: 'row',
-    gap: Spacing.xs,
-    marginTop: Spacing.xs,
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
   },
-  sectionCard: {
-    padding: Spacing.lg,
-    gap: Spacing.md,
+  statDivider: {
+    width: 1,
+    height: '65%',
+    backgroundColor: '#CBD5E1',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  subHeading: {
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  chipGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.xs,
-  },
-  switchRow: {
+  premiumCard: {
+    backgroundColor: '#FEF9C3',
+    borderRadius: 24,
+    padding: 20,
+    marginTop: 20,
+    marginHorizontal: Spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#FEF08A',
   },
-  switchTextCol: {
+  premiumLeftContent: {
     flex: 1,
-    gap: 2,
-    marginRight: Spacing.md,
+    marginRight: 12,
   },
-  switchLabel: {
-    fontSize: 15,
+  premiumTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  premiumSubtitle: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: '#475569',
+    lineHeight: 16,
+    marginTop: 6,
+    marginBottom: 16,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerBadgeCrown: {
+    marginLeft: 6,
+    backgroundColor: '#FEF3C7',
+    padding: 4,
+    borderRadius: 12,
+  },
+  premiumActiveCard: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 24,
+    padding: 20,
+    marginTop: 20,
+    marginHorizontal: Spacing.lg,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  premiumActiveHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  premiumActiveTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#92400E',
+    marginLeft: 8,
+  },
+  premiumActiveSubtitle: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#B45309',
+    marginBottom: 12,
+  },
+  premiumFeatureList: {
+    gap: 4,
+  },
+  premiumFeatureItem: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#78350F',
+  },
+  upgradeBtn: {
+    backgroundColor: '#1E293B',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    alignSelf: 'flex-start',
+  },
+  upgradeBtnText: {
+    fontSize: 13,
     fontWeight: '700',
+    color: '#FFFFFF',
   },
-  signOutBtn: {
-    marginTop: Spacing.sm,
-    borderColor: Colors.error,
+  premiumBadgeWrapper: {
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  founderCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginTop: 28,
+    marginHorizontal: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  founderLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  founderIconPill: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  founderTitleText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#1E293B',
+    letterSpacing: 0.2,
+    marginLeft: 12,
+    flex: 1,
   },
 });

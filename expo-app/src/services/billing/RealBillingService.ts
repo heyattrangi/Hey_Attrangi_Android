@@ -1,13 +1,30 @@
 import { IBillingService } from './IBillingService';
 import { mockBillingService } from './MockBillingService';
+import { profileRepository } from '../../repositories/ProfileRepository';
+import { successResponse } from '../../api/client';
+import { SubscriptionPlanId } from '../../types/domain';
 
-/**
- * Real billing service — delegates to mock until Razorpay/Stripe routes exist.
- * Swap method bodies to call BillingRepository / PaymentRepository.
- */
 export class RealBillingService implements IBillingService {
   getPlans = mockBillingService.getPlans.bind(mockBillingService);
-  getActivePlanId = mockBillingService.getActivePlanId.bind(mockBillingService);
+  
+  async getActivePlanId() {
+    try {
+      const user = await profileRepository.getMobileMe();
+      const rawPlan = (user?.plan || '').toUpperCase();
+      let planId: SubscriptionPlanId = 'free';
+      if (rawPlan === 'PREMIUM') {
+        planId = 'premium';
+      } else if (rawPlan === 'ESSENTIAL') {
+        planId = 'essential';
+      }
+      console.log(`[PREMIUM_DEBUG] RealBillingService.getActivePlanId: rawPlan=${rawPlan} -> planId=${planId}`);
+      return successResponse(planId);
+    } catch (err) {
+      console.log('[PREMIUM_DEBUG] RealBillingService fetch error:', err);
+      return mockBillingService.getActivePlanId();
+    }
+  }
+
   getComparison = mockBillingService.getComparison.bind(mockBillingService);
   getInvoices = mockBillingService.getInvoices.bind(mockBillingService);
   getInvoice = mockBillingService.getInvoice.bind(mockBillingService);

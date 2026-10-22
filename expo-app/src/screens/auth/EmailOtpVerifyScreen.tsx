@@ -53,7 +53,7 @@ export const EmailOtpVerifyScreen: React.FC<Props> = ({ navigation, route }) => 
     setError(undefined);
     void hapticLight();
     try {
-      await sendEmailOtp(email);
+      await sendEmailOtp(email, true);
       setTimer(OTP_RESEND_COOLDOWN_SECONDS);
       setCanResend(false);
       setOtpDigits(Array(6).fill(''));
@@ -89,6 +89,17 @@ export const EmailOtpVerifyScreen: React.FC<Props> = ({ navigation, route }) => 
   return (
     <Screen backgroundColor={Colors.surface}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Hey Attrangi Logo Header */}
+        <View style={styles.brandRow}>
+          <View style={styles.logoGrid}>
+            <View style={[styles.logoSquare, { backgroundColor: '#FFC107', borderTopLeftRadius: 3 }]} />
+            <View style={[styles.logoSquare, { backgroundColor: '#FF5252', borderTopRightRadius: 3 }]} />
+            <View style={[styles.logoSquare, { backgroundColor: '#FF9800', borderBottomLeftRadius: 3 }]} />
+            <View style={[styles.logoSquare, { backgroundColor: '#E64A19', borderBottomRightRadius: 3 }]} />
+          </View>
+          <Text style={styles.brandTitle}>Hey Attrangi</Text>
+        </View>
+
         {/* Back Link */}
         <TouchableOpacity
           style={styles.backRow}
@@ -96,6 +107,7 @@ export const EmailOtpVerifyScreen: React.FC<Props> = ({ navigation, route }) => 
             void hapticLight();
             navigation.goBack();
           }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Icon name={AppIcons.back} size={18} color={Colors.brandPrimary} />
           <Text variant="bodyMedium" color={Colors.brandPrimary} style={styles.backText}>
@@ -105,11 +117,12 @@ export const EmailOtpVerifyScreen: React.FC<Props> = ({ navigation, route }) => 
 
         {/* Header */}
         <View style={styles.header}>
-          <Text variant="heading1" style={styles.title}>
-            Login or Signup to Hey Attrangi
+          <Text style={styles.title}>
+            Let's create your{'\n'}personal space.
           </Text>
-          <Text variant="bodyMedium" color={Colors.textSecondary} style={styles.subtitle}>
-            We sent a 6-digit verification code to <Text variant="bodyMedium" color={Colors.brandPrimary} style={styles.emailHighlight}>{email}</Text>.
+          <Text style={styles.subtitle}>
+            Verify the 6-digit code sent to your email.{'\n'}
+            <Text style={styles.emailHighlight}>{email}</Text>
           </Text>
         </View>
 
@@ -139,6 +152,7 @@ export const EmailOtpVerifyScreen: React.FC<Props> = ({ navigation, route }) => 
                 void hapticLight();
                 navigation.goBack();
               }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Text variant="caption" color={Colors.brandPrimary} style={styles.changeEmailText}>
                 ← Use a different email
@@ -148,6 +162,7 @@ export const EmailOtpVerifyScreen: React.FC<Props> = ({ navigation, route }) => 
             <TouchableOpacity
               onPress={handleResend}
               disabled={!canResend || loading}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Text
                 variant="caption"
@@ -179,6 +194,28 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: Spacing.lg,
     paddingTop: Spacing.md,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  logoGrid: {
+    width: 24,
+    height: 24,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginRight: 8,
+  },
+  logoSquare: {
+    width: 11,
+    height: 11,
+    margin: 0.5,
+  },
+  brandTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
   },
   backRow: {
     flexDirection: 'row',

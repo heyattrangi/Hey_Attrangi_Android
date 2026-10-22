@@ -975,6 +975,7 @@ export interface SignUpPayload {
   relationship?: string | null;
   trustedContactName?: string;
   trustedContactPhone?: string;
+  referralCode?: string;
 }
 
 export interface OtpSendResult {
@@ -1046,6 +1047,8 @@ export interface ProfileBundle {
   creditActivity: CreditActivity[];
   selectedPaymentMethod: PaymentMethod;
   creditPurchaseAmount: number;
+  plan?: string;
+  role?: string;
 }
 
 export interface MoodConfig {
@@ -1575,7 +1578,7 @@ export type PlatformRoleId =
 export type MainTabId =
   | 'HomeTab'
   | 'ChatTab'
-  | 'JourneyTab'
+  | 'MyWellbeingTab'
   | 'MoodTab'
   | 'TherapistsTab'
   | 'ProfileTab'

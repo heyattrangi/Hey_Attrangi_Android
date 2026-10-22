@@ -7,6 +7,8 @@ import {
   Text,
   ScrollView,
   ViewStyle,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Radius, Spacing, Shadows, Elevation } from '../../app/design-system';
@@ -36,35 +38,40 @@ export const BottomSheet = memo<BottomSheetProps>(({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={styles.overlay}>
-        <Pressable
-          style={styles.backdrop}
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss sheet"
-        />
-        <View
-          style={[
-            styles.sheet,
-            { paddingBottom: Math.max(insets.bottom, Spacing.lg) },
-            contentStyle,
-          ]}
-        >
-          <View style={styles.handle} />
-          {title ? (
-            <Text style={styles.title} maxFontSizeMultiplier={1.3}>
-              {title}
-            </Text>
-          ) : null}
-          <ScrollView
-            bounces={false}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.overlay}>
+          <Pressable
+            style={styles.backdrop}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss sheet"
+          />
+          <View
+            style={[
+              styles.sheet,
+              { paddingBottom: Math.max(insets.bottom, Spacing.lg) },
+              contentStyle,
+            ]}
           >
-            {children}
-          </ScrollView>
+            <View style={styles.handle} />
+            {title ? (
+              <Text style={styles.title} maxFontSizeMultiplier={1.3}>
+                {title}
+              </Text>
+            ) : null}
+            <ScrollView
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {children}
+            </ScrollView>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </RNModal>
   );
 });

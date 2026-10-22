@@ -17,9 +17,30 @@ type Props = {
 
 export const AccountManagementScreen: React.FC<Props> = ({ navigation }) => {
   const logout = useAuthStore((s) => s.logout);
+  const deleteAccount = useAuthStore((s) => s.deleteAccount);
   const showToast = useUiStore((s) => s.showToast);
+
   const [logoutVisible, setLogoutVisible] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteAccount();
+      setDeleteVisible(false);
+      showToast('Account permanently deleted', 'success');
+    } catch (err: any) {
+      const rawMsg = err?.message || '';
+      const friendlyMsg =
+        rawMsg && !rawMsg.includes('427') && !rawMsg.includes('429') && !rawMsg.includes('AxiosError')
+          ? rawMsg
+          : 'Unable to delete your account right now. Please try again.';
+      Alert.alert('Account Deletion Notice', friendlyMsg);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const rows: Array<{
     label: string;
@@ -106,11 +127,11 @@ export const AccountManagementScreen: React.FC<Props> = ({ navigation }) => {
 
       <DeleteAccountDialog
         visible={deleteVisible}
-        onCancel={() => setDeleteVisible(false)}
-        onConfirm={() => {
-          setDeleteVisible(false);
-          showToast('Account deletion prepared (frontend only)', 'error');
+        isDeleting={isDeleting}
+        onCancel={() => {
+          if (!isDeleting) setDeleteVisible(false);
         }}
+        onConfirm={handleDeleteAccount}
       />
     </AppScreen>
   );

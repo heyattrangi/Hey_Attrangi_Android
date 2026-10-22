@@ -30,7 +30,7 @@ const SIZE_MAP: Record<AvatarSize, number> = {
 };
 
 const initialsFromName = (name?: string) => {
-  if (!name?.trim()) return '?';
+  if (!name?.trim()) return 'A';
   const parts = name.trim().split(/\s+/);
   if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
